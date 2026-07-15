@@ -62,32 +62,15 @@ python3 gesture_detector.py
 ```
 * `L` / `R` 키를 누르면 다음/이전 곡이 넘어가고, `Space` 키는 일시정지, `S` 키는 홀로그램에 물리 회전력을 가합니다.
 
+---
+
 ## 🔌 실제 라즈베리파이로 포팅 시 하드웨어 연결 및 실행 가이드
 
-### 0. 의존성 패키지 설치 및 실행 (라즈베리파이 4/5 기준)
-라즈베리파이 터미널(또는 SSH)에서 아래 명령어를 수행하여 필요한 패키지를 설치하고 서버를 실행합니다:
-
+### 0. 의존성 패키지 설치 (라즈베리파이 4/5 기준)
+라즈베리파이에서 OpenCV 및 가상환경을 정상적으로 구동하기 위해 터미널에서 아래 필수 시스템 패키지 설치 명령을 수행합니다:
 ```bash
-# 1. SSH 접속
-ssh mingyu@mingyu.local
-
-# 2. 프로젝트 디렉토리 이동
-cd ~/hologram-web
-
-# 3. 시스템 패키지 설치
 sudo apt update
 sudo apt install -y python3-pip python3-venv python3-dev libgl1 libglib2.0-0
-
-# 4. 가상환경 생성 및 활성화
-python3 -m venv .venv
-source .venv/bin/activate
-
-# 5. pip 최신화 및 Python 패키지 설치
-pip install --upgrade pip
-pip install flask flask-socketio
-
-# 6. Flask 서버 가동
-python3 app.py
 ```
 
 ### 1. 디스플레이 & 피라미드 아크릴
@@ -98,9 +81,11 @@ python3 app.py
 * `gesture_detector.py` 내부의 `run_physical_camera_detector` 예시 주석을 참고하여 카메라 캡처 루프를 구성합니다.
 * 감지된 좌표 및 핀치 이벤트를 동일하게 WebSocket `sio.emit('hardware_gesture', ...)`로 전송하면 수정 없이 완벽히 구동됩니다.
 
-### 3. 무선 원격 제어 (Pure Viewer & Remote Control)
+### 3. 디버깅 창 가리기 및 무선 원격 제어 (Kiosk Mode & Remote Control)
 실제 라즈베리파이에 장착된 투사용 디스플레이에는 오직 홀로그램 메쉬만 깔끔하게 노출하고, 폰이나 다른 PC로 편리하게 무선 제어할 수 있습니다.
-* **본체 투사 브라우저 실행**: `http://localhost:5001/` 주소로 브라우저를 띄웁니다. 메인 페이지에는 조작 패널이나 디버깅 레이아웃 마크업 자체가 완전히 배제되어 있어, 100% 깔끔한 투사용 3D 화면만 나타납니다.
-* **무선 원격 제어 페이지 접속**: 스마트폰이나 태블릿 등 외부 장치 브라우저로 `http://<라즈베리파이-IP>:5001/control` (또는 맥북의 경우 `http://mingyu.local:5001/control`) 에 접속합니다.
+* **본체 투사 브라우저 실행**: `http://localhost:5001/` 주소로 브라우저를 띄우면 디버깅 패널 및 더블클릭 등의 안내 문구가 화면에서 완전히 배제되어 깔끔한 투사 환경이 완성됩니다.
+* **무선 원격 제어 페이지 접속**: 스마트폰이나 태블릿 등 외부 장치 브라우저로 `http://<라즈베리파이-IP>:5001/control`에 연결합니다.
   * 본체에서 돌아가는 실시간 곡명, 가수명, 앨범아트 회전 싱크 및 오디오 진행 시간(SeekBar) 정보가 매초 자동 갱신됩니다.
   * 리모컨에서 원격 재생/일시정지/탐색/곡넘김 조작을 수행하고, 감도 슬라이더 및 제미나이 텍스트 프롬프트를 원격 무선 전송하여 본체 동작을 편하게 테스트할 수 있습니다.
+
+### 444
