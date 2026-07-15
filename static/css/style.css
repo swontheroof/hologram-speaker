@@ -1,0 +1,348 @@
+:root {
+    --bg-black: hsl(220, 30%, 4%);
+    --bg-dark-gray: hsl(220, 20%, 9%);
+    --bg-glass: rgba(18, 22, 33, 0.7);
+    --border-glass: rgba(255, 255, 255, 0.08);
+    --text-primary: hsl(210, 40%, 98%);
+    --text-secondary: hsl(215, 20%, 70%);
+    --accent-red: hsl(340, 85%, 55%);
+    --accent-blue: hsl(200, 100%, 50%);
+    --accent-blue-glow: rgba(0, 172, 255, 0.4);
+    --terminal-green: hsl(120, 100%, 50%);
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background-color: var(--bg-black);
+    color: var(--text-primary);
+    font-family: 'Outfit', sans-serif;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* Layout Setup */
+.main-layout {
+    display: flex;
+    width: 100vw;
+    height: 100vh;
+    transition: all 0.3s ease;
+}
+
+/* Sidebar Dashboard Styling */
+.control-panel {
+    width: 380px;
+    height: 100%;
+    background: var(--bg-glass);
+    backdrop-filter: blur(20px);
+    border-right: 1px solid var(--border-glass);
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    overflow-y: auto;
+    flex-shrink: 0;
+    z-index: 10;
+}
+
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-glass);
+    padding-bottom: 1rem;
+}
+
+.panel-header .logo {
+    font-weight: 800;
+    font-size: 1.2rem;
+    color: var(--text-primary);
+    background: linear-gradient(90deg, #fff, var(--accent-red));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.kiosk-toggle {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-glass);
+    color: var(--text-primary);
+    padding: 0.4rem 0.8rem;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.kiosk-toggle:hover {
+    background: var(--accent-blue);
+    box-shadow: 0 0 15px var(--accent-blue-glow);
+    border-color: var(--accent-blue);
+}
+
+/* Section Box */
+.panel-section {
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--border-glass);
+    border-radius: 12px;
+    padding: 1rem;
+}
+
+.panel-section h3 {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.75rem;
+}
+
+/* Track Card Spec */
+.track-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 0.75rem;
+}
+
+.album-cover-container {
+    width: 130px;
+    height: 130px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 3px solid var(--border-glass);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    animation: rotate-disk 15s linear infinite;
+    animation-play-state: paused;
+}
+
+.album-cover-container img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.track-details h2 {
+    font-size: 1.1rem;
+    font-weight: bold;
+}
+
+.track-details p {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.audio-controls {
+    display: flex;
+    gap: 1.25rem;
+    margin-top: 0.5rem;
+}
+
+.btn-audio {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-glass);
+    color: #fff;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.btn-audio:hover {
+    background: rgba(255, 255, 255, 0.15);
+    transform: scale(1.05);
+}
+
+.btn-audio.play-pause {
+    background: var(--accent-red);
+    border-color: var(--accent-red);
+}
+
+/* Seek Bar / Range Styling */
+.progress-container {
+    width: 100%;
+    margin-top: 0.75rem;
+}
+
+.progress-container input[type="range"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.1);
+    outline: none;
+    cursor: pointer;
+}
+
+.progress-container input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--accent-red);
+}
+
+.time-readout {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-top: 0.25rem;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+/* Playlist Styling */
+.song-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 180px;
+    overflow-y: auto;
+}
+
+.song-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border: 1px solid transparent;
+}
+
+.song-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.song-item.active {
+    background: rgba(0, 172, 255, 0.1);
+    border-color: rgba(0, 172, 255, 0.2);
+}
+
+.song-item-cover {
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    object-fit: cover;
+}
+
+.song-item-info {
+    flex-grow: 1;
+}
+
+.song-item-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.song-item-artist {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+}
+
+/* Settings Sliders */
+.setting-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.setting-row label {
+    color: var(--text-secondary);
+}
+
+.setting-row input[type="range"] {
+    width: 120px;
+}
+
+/* Webcam Debug Styling */
+.debug-status {
+    font-size: 0.75rem;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--terminal-green);
+    margin-bottom: 0.5rem;
+}
+
+.video-container {
+    position: relative;
+    width: 100%;
+    height: 150px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #000;
+}
+
+#gesture-canvas {
+    width: 100%;
+    height: 100%;
+    transform: scaleX(-1); /* mirror webcam */
+}
+
+/* Hologram Display Area */
+.hologram-viewport-area {
+    flex-grow: 1;
+    height: 100%;
+    position: relative;
+    background: #000;
+}
+
+#hologram-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* Fullscreen mode layouts */
+.main-layout.kiosk-active .control-panel {
+    display: none;
+}
+
+.main-layout.kiosk-active .hologram-viewport-area {
+    width: 100vw;
+    height: 100vh;
+}
+
+.kiosk-exit-instructions {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    border: 1px solid rgba(255,255,255,0.1);
+    padding: 0.5rem 1rem;
+    border-radius: 30px;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+    z-index: 100;
+}
+
+.main-layout.kiosk-active .kiosk-exit-instructions {
+    opacity: 1;
+    animation: fadeout 4s forwards;
+    animation-delay: 2s;
+}
+
+@keyframes rotate-disk {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+@keyframes fadeout {
+    to { opacity: 0; }
+}
