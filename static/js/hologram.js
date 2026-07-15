@@ -51,7 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let sourceNode = null;
 
     // Interaction Parameters
-    let friction = parseFloat(frictionSlider.value);
+    let friction = parseFloat(frictionSlider.value) || 0.98;
     let showGuides = guideToggle.checked;
 
     // Swipe & Rotation Physics State
@@ -464,7 +464,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function initThreeJS() {
         const canvas = document.getElementById('hologram-canvas');
         renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false });
-        renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+        renderer.setSize(window.innerWidth, window.innerHeight);
         // Set pixel ratio to 1.0 for performance optimization on Raspberry Pi 5
         renderer.setPixelRatio(1.0);
         renderer.autoClear = false;
@@ -624,15 +624,14 @@ document.addEventListener('DOMContentLoaded', () => {
         window.addEventListener('resize', onWindowResize);
         onWindowResize();
 
+
+
         // Start Animation Loop
         renderer.setAnimationLoop(animate);
     }
 
     function onWindowResize() {
-        const canvas = document.getElementById('hologram-canvas');
-        const w = canvas.clientWidth;
-        const h = canvas.clientHeight;
-        renderer.setSize(w, h);
+        renderer.setSize(window.innerWidth, window.innerHeight);
 
         // Update aspect ratios of cameras if window changes
         [cameraNorth, cameraSouth, cameraEast, cameraWest].forEach(cam => {
@@ -643,6 +642,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 4. Animation loop and 4-way viewport splitting
     function animate() {
+
+
         // A. Apply rotation physics (Inertia & Damping)
         if (!isDragging && !isGestureDragging) {
             if (HologramStateManager.currentMode === 'GEMINI') {
@@ -855,9 +856,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // C. Divide single WebGL context into 4 Viewports (North, South, East, West)
-        const canvas = renderer.domElement;
-        const w = canvas.clientWidth;
-        const h = canvas.clientHeight;
+        const w = window.innerWidth;
+        const h = window.innerHeight;
 
         const cx = w / 2;
         const cy = h / 2;
@@ -1934,17 +1934,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }, 1000);
 
-    // Auto-Kiosk mode check via ?kiosk=true query parameter
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('kiosk') === 'true') {
-        mainLayout.classList.add('kiosk-active');
-        const exitInstruction = document.getElementById('exit-instruction');
-        if (exitInstruction) {
-            exitInstruction.style.display = 'none'; // Hide dblclick hint for production deployment
-        }
-        // Wait a split second to render UI correctly then resize ThreeJS viewport
-        setTimeout(() => {
-            onWindowResize();
-        }, 100);
-    }
+    // Force a resize calculation on page load to ensure full viewport size is initialized correctly
+    setTimeout(() => {
+        onWindowResize();
+    }, 150);
 });
