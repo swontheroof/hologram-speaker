@@ -83,10 +83,58 @@ def create_status_frame(message):
     except Exception:
         return b''
 
+# Integrated Motion Gesture Detector for Pi Camera
+prev_motion_gray = None
+last_motion_gesture_time = 0
+
+def process_motion_gesture(frame):
+    global prev_motion_gray, last_motion_gesture_time
+    try:
+        import cv2
+        import numpy as np
+        import time
+
+        current_time = time.time()
+        if current_time - last_motion_gesture_time < 0.9: # 0.9s gesture cooldown
+            return
+
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        gray = cv2.GaussianBlur(gray, (21, 21), 0)
+
+        if prev_motion_gray is None or prev_motion_gray.shape != gray.shape:
+            prev_motion_gray = gray
+            return
+
+        frame_diff = cv2.absdiff(prev_motion_gray, gray)
+        thresh = cv2.threshold(frame_diff, 25, 255, cv2.THRESH_BINARY)[1]
+        thresh = cv2.dilate(thresh, None, iterations=2)
+
+        contours, _ = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        prev_motion_gray = gray
+
+        motion_area = sum(cv2.contourArea(c) for c in contours if cv2.contourArea(c) > 3000)
+        if motion_area > 7000:
+            M = cv2.moments(thresh)
+            if M["m00"] != 0:
+                cx = int(M["m10"] / M["m00"])
+                w = frame.shape[1]
+                if cx > int(w * 0.65):
+                    print("[Camera Gesture] Motion Swipe Right detected! -> Next Track", flush=True)
+                    socketio.emit('hardware_gesture', {'type': 'next'})
+                    last_motion_gesture_time = current_time
+                elif cx < int(w * 0.35):
+                    print("[Camera Gesture] Motion Swipe Left detected! -> Previous Track", flush=True)
+                    socketio.emit('hardware_gesture', {'type': 'prev'})
+                    last_motion_gesture_time = current_time
+    except Exception:
+        pass
+
 def gen_camera_frames():
-    """MJPEG Live Camera Streamer supporting Raspberry Pi 5 libcamera (rpicam-vid) & V4L2 nodes"""
+    """MJPEG Live Camera Streamer with built-in Gesture Detection for Pi 5"""
     import subprocess
     import shutil
+    import cv2
+    import numpy as np
 
     # 1. Try native Raspberry Pi 5 libcamera streamer (rpicam-vid / libcamera-vid)
     cam_cmd = shutil.which("rpicam-vid") or shutil.which("libcamera-vid")
@@ -114,6 +162,12 @@ def gen_camera_frames():
                 if a != -1 and b != -1:
                     jpg = buffer[a:b+2]
                     buffer = buffer[b+2:]
+                    
+                    # Analyze motion gesture in real-time
+                    frame_decoded = cv2.imdecode(np.frombuffer(jpg, dtype=np.uint8), cv2.IMREAD_COLOR)
+                    if frame_decoded is not None:
+                        process_motion_gesture(frame_decoded)
+
                     yield (b'--frame\r\n'
                            b'Content-Type: image/jpeg\r\n\r\n' + jpg + b'\r\n')
         except Exception as e:
