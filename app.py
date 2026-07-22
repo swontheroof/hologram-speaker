@@ -214,4 +214,4 @@ def handle_remote_chat(data):
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5001))
     print(f"Starting Hologram Speaker Server on http://0.0.0.0:{port} ...")
-    socketio.run(app, debug=True, host='0.0.0.0', port=port)
+    socketio.run(app, debug=True, host='::', port=port)

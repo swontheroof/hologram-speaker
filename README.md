@@ -79,9 +79,8 @@ sudo apt install -y python3-pip python3-venv python3-dev libgl1 libglib2.0-0
 python3 -m venv .venv
 source .venv/bin/activate
 
-pip install —upgrade pip
-pip install flask flask-socketio
-pip install opencv-python mediapipe python-socketio
+pip install --upgrade pip
+pip install flask flask-socketio python-socketio opencv-python
 
 python3 app.py
 ```
