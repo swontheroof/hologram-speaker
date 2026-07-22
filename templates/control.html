@@ -397,6 +397,18 @@
                 연결 대기 중...
             </div>
         </section>
+
+        <!-- Live Camera Monitor Section -->
+        <section class="panel-section">
+            <h3 class="section-title" style="display: flex; justify-content: space-between; align-items: center;">
+                <span>📷 실시간 카메라 라이브 스트림</span>
+                <button type="button" id="btn-toggle-camera-stream" style="background: rgba(255,255,255,0.1); border: 1px solid var(--border-glass); color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; cursor: pointer;">미리보기 열기</button>
+            </h3>
+            <div id="camera-stream-container" style="display: none; margin-top: 10px; text-align: center; background: #000; border-radius: 12px; overflow: hidden; border: 1px solid var(--border-glass);">
+                <img id="camera-stream-img" src="" alt="카메라 스트림 중단됨" style="width: 100%; height: auto; display: block; min-height: 180px; background: #111; color: #888; object-fit: contain;">
+                <p style="padding: 6px; font-size: 0.75rem; color: var(--text-secondary);">전체화면 URL: <a href="/video_feed" target="_blank" style="color: var(--accent-blue);">/video_feed</a></p>
+            </div>
+        </section>
     </div>
 
     <script>
@@ -558,6 +570,23 @@
         sliderSensitivity.addEventListener('change', emitSettings);
         toggleGuides.addEventListener('change', emitSettings);
         toggleWebcam.addEventListener('change', emitSettings);
+
+        // 5. Live Camera Stream preview toggle
+        const btnToggleCamStream = document.getElementById('btn-toggle-camera-stream');
+        const camStreamContainer = document.getElementById('camera-stream-container');
+        const camStreamImg = document.getElementById('camera-stream-img');
+
+        btnToggleCamStream.addEventListener('click', () => {
+            if (camStreamContainer.style.display === 'none') {
+                camStreamContainer.style.display = 'block';
+                camStreamImg.src = '/video_feed';
+                btnToggleCamStream.textContent = '닫기';
+            } else {
+                camStreamContainer.style.display = 'none';
+                camStreamImg.src = '';
+                btnToggleCamStream.textContent = '미리보기 열기';
+            }
+        });
     </script>
 </body>
 </html>
