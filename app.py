@@ -84,14 +84,46 @@ def create_status_frame(message):
         return b''
 
 def gen_camera_frames():
-    """MJPEG Live Camera Streamer supporting Raspberry Pi 5 libcamera nodes (/dev/video20, /dev/video0)"""
+    """MJPEG Live Camera Streamer supporting Raspberry Pi 5 libcamera (rpicam-vid) & V4L2 nodes"""
+    import subprocess
+    import shutil
+
+    # 1. Try native Raspberry Pi 5 libcamera streamer (rpicam-vid / libcamera-vid)
+    cam_cmd = shutil.which("rpicam-vid") or shutil.which("libcamera-vid")
+    if cam_cmd:
+        try:
+            print(f"[Camera Stream] Starting Pi 5 libcamera process: {cam_cmd}")
+            proc = subprocess.Popen(
+                [cam_cmd, "-t", "0", "--inline", "--width", "640", "--height", "480", "--codec", "mjpeg", "--framerate", "30", "-o", "-"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL
+            )
+            buffer = b""
+            while True:
+                chunk = proc.stdout.read(4096)
+                if not chunk:
+                    break
+                buffer += chunk
+                a = buffer.find(b'\xff\xd8')
+                b = buffer.find(b'\xff\xd9')
+                if a != -1 and b != -1:
+                    jpg = buffer[a:b+2]
+                    buffer = buffer[b+2:]
+                    yield (b'--frame\r\n'
+                           b'Content-Type: image/jpeg\r\n\r\n' + jpg + b'\r\n')
+            proc.terminate()
+            return
+        except Exception as e:
+            print(f"[Camera Stream rpicam-vid Error] {e}")
+
+    # 2. Fallback to OpenCV V4L2 device probing
     try:
         import cv2
         cap = None
-        # Try index 20 (Raspberry Pi 5) first, then index 0, with V4L2 backend
-        for idx in [20, 0, 19, 1]:
+        for idx in [20, 19, 21, 0, 1]:
             temp_cap = cv2.VideoCapture(idx, cv2.CAP_V4L2) if hasattr(cv2, 'CAP_V4L2') else cv2.VideoCapture(idx)
             if temp_cap.isOpened():
+                temp_cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
                 ret, test_frame = temp_cap.read()
                 if ret and test_frame is not None:
                     cap = temp_cap
