@@ -134,14 +134,6 @@ def process_motion_gesture(frame):
 
             if results and results.multi_hand_landmarks:
                 for hand_landmarks in results.multi_hand_landmarks:
-                    # DRAW MEDIAPIPE 21 SKELETON JOINTS ON THE LIVE STREAM PREVIEW!
-                    if mp_drawing and mp_hands_solution:
-                        mp_drawing.draw_landmarks(
-                            frame,
-                            hand_landmarks,
-                            mp_hands_solution.HAND_CONNECTIONS
-                        )
-
                     thumb_tip = hand_landmarks.landmark[4]
                     index_tip = hand_landmarks.landmark[8]
                     index_pip = hand_landmarks.landmark[6]
@@ -340,14 +332,10 @@ def gen_camera_frames():
                     jpg = buffer[a:b+2]
                     buffer = buffer[b+2:]
                     
-                    # Analyze motion gesture and draw MediaPipe AI skeleton overlay in real-time
+                    # Analyze MediaPipe AI motion gesture in real-time
                     frame_decoded = cv2.imdecode(np.frombuffer(jpg, dtype=np.uint8), cv2.IMREAD_COLOR)
                     if frame_decoded is not None:
                         process_motion_gesture(frame_decoded)
-                        # Re-encode annotated frame with MediaPipe 21 keypoint lines to JPEG
-                        ret_enc, annotated_jpg = cv2.imencode('.jpg', frame_decoded)
-                        if ret_enc:
-                            jpg = annotated_jpg.tobytes()
 
                     yield (b'--frame\r\n'
                            b'Content-Type: image/jpeg\r\n\r\n' + jpg + b'\r\n')
