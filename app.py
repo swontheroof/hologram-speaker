@@ -99,14 +99,22 @@ except Exception:
     mp_hands_detector = None
     print("[Camera Stream] Operating in Pure OpenCV Motion Detection Mode", flush=True)
 
-mp_prev_x = None
+mp_history = []
 mp_last_gesture_time = 0
+is_pinching = False
+pinch_start_time = 0
+mp_last_seek_time = 0
+mp_prev_point_x = None
+mp_prev_point_y = None
+
 prev_motion_gray = None
 motion_history = []
 last_motion_gesture_time = 0
 
 def process_motion_gesture(frame):
-    global mp_hands_detector, mp_prev_x, mp_last_gesture_time
+    global mp_hands_detector, mp_history, mp_last_gesture_time
+    global is_pinching, pinch_start_time, mp_last_seek_time
+    global mp_prev_point_x, mp_prev_point_y
     global prev_motion_gray, motion_history, last_motion_gesture_time
     try:
         import cv2
@@ -117,9 +125,6 @@ def process_motion_gesture(frame):
 
         # 1. Preferred AI Mode: MediaPipe 21-Keypoint Tracker (99.9% Accuracy)
         if mp_hands_detector is not None:
-            if current_time - mp_last_gesture_time < 0.8:
-                return
-
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             results = mp_hands_detector.process(rgb_frame)
 
@@ -127,36 +132,100 @@ def process_motion_gesture(frame):
                 for hand_landmarks in results.multi_hand_landmarks:
                     thumb_tip = hand_landmarks.landmark[4]
                     index_tip = hand_landmarks.landmark[8]
-                    middle_mcp = hand_landmarks.landmark[9]
+                    index_pip = hand_landmarks.landmark[6]
+                    middle_tip = hand_landmarks.landmark[12]
+                    middle_pip = hand_landmarks.landmark[10]
+                    ring_tip = hand_landmarks.landmark[16]
+                    ring_pip = hand_landmarks.landmark[14]
+                    wrist = hand_landmarks.landmark[0]
 
-                    # Pinch Detection: distance between thumb tip and index tip
                     dist_pinch = np.hypot(thumb_tip.x - index_tip.x, thumb_tip.y - index_tip.y)
-                    if dist_pinch < 0.06:
-                        print("[Camera Gesture - MediaPipe AI] Pinch detected! -> Play/Pause Toggle", flush=True)
-                        socketio.emit('gesture_trigger', {'type': 'play_pause'})
-                        mp_last_gesture_time = current_time
-                        mp_prev_x = None
+
+                    # Check Index Finger Pointing posture (Index extended, others folded)
+                    is_index_extended = index_tip.y < index_pip.y
+                    is_others_folded = (middle_tip.y > middle_pip.y) and (ring_tip.y > ring_pip.y)
+
+                    # --- 1. INDEX FINGER POINTING (3D Cube Space Touch Rotation) ---
+                    if is_index_extended and is_others_folded and dist_pinch > 0.08:
+                        curr_px = 1.0 - index_tip.x # Mirrored X
+                        curr_py = index_tip.y
+                        if mp_prev_point_x is not None and mp_prev_point_y is not None:
+                            dx = curr_px - mp_prev_point_x
+                            dy = curr_py - mp_prev_point_y
+                            if abs(dx) > 0.002 or abs(dy) > 0.002:
+                                print(f"[Camera Gesture - MediaPipe AI] 3D Cube Rotation (dx: {dx:.3f}, dy: {dy:.3f})", flush=True)
+                                socketio.emit('gesture_trigger', {
+                                    'type': 'rotate',
+                                    'dx': dx * 10.0,
+                                    'dy': dy * 10.0,
+                                    'x': curr_px,
+                                    'y': curr_py,
+                                    'touch': True
+                                })
+                        mp_prev_point_x = curr_px
+                        mp_prev_point_y = curr_py
+                        is_pinching = False
+                        return
+                    else:
+                        mp_prev_point_x = None
+                        mp_prev_point_y = None
+
+                    # --- 2. PINCH DETECTED (Seek & Play/Pause) ---
+                    if dist_pinch < 0.075:
+                        if not is_pinching:
+                            is_pinching = True
+                            pinch_start_time = current_time
+
+                        if current_time - pinch_start_time > 0.22:
+                            if current_time - mp_last_seek_time > 0.08:
+                                progress_ratio = 1.0 - index_tip.x
+                                progress_ratio = max(0.0, min(1.0, progress_ratio))
+                                print(f"[Camera Gesture - MediaPipe AI] Pinch Drag Seeking to {int(progress_ratio*100)}%", flush=True)
+                                socketio.emit('gesture_trigger', {'type': 'seek', 'value': progress_ratio})
+                                mp_last_seek_time = current_time
+                        return
+                    else:
+                        if is_pinching:
+                            pinch_duration = current_time - pinch_start_time
+                            is_pinching = False
+                            if pinch_duration < 0.35:
+                                print("[Camera Gesture - MediaPipe AI] Quick Pinch Tap! -> Play/Pause Toggle", flush=True)
+                                socketio.emit('gesture_trigger', {'type': 'play_pause'})
+                                mp_last_gesture_time = current_time
+                                mp_history = []
+                                return
+
+                    # --- 3. OPEN HAND SWIPE DETECTION (Next/Prev Song) ---
+                    if current_time - mp_last_gesture_time < 0.75:
+                        mp_history = []
                         return
 
-                    # Swipe Detection: tracking hand movement (middle_mcp.x)
-                    curr_x = middle_mcp.x
-                    if mp_prev_x is not None:
-                        dx = curr_x - mp_prev_x
-                        if dx > 0.14: # Swipe Right
-                            print("[Camera Gesture - MediaPipe AI] Swipe Right detected! -> Next Track", flush=True)
-                            socketio.emit('gesture_trigger', {'type': 'next'})
-                            mp_last_gesture_time = current_time
-                            mp_prev_x = None
-                            return
-                        elif dx < -0.14: # Swipe Left
-                            print("[Camera Gesture - MediaPipe AI] Swipe Left detected! -> Previous Track", flush=True)
-                            socketio.emit('gesture_trigger', {'type': 'prev'})
-                            mp_last_gesture_time = current_time
-                            mp_prev_x = None
-                            return
-                    mp_prev_x = curr_x
+                    mp_history.append((wrist.x, current_time))
+                    if len(mp_history) > 6:
+                        mp_history.pop(0)
+
+                    if len(mp_history) >= 3:
+                        dx_total = mp_history[-1][0] - mp_history[0][0]
+                        dt_total = mp_history[-1][1] - mp_history[0][1]
+
+                        if 0.06 <= dt_total <= 0.6:
+                            if dx_total > 0.08:
+                                print("[Camera Gesture - MediaPipe AI] Swipe Right detected! -> Next Track", flush=True)
+                                socketio.emit('gesture_trigger', {'type': 'next'})
+                                mp_last_gesture_time = current_time
+                                mp_history = []
+                                return
+                            elif dx_total < -0.08:
+                                print("[Camera Gesture - MediaPipe AI] Swipe Left detected! -> Previous Track", flush=True)
+                                socketio.emit('gesture_trigger', {'type': 'prev'})
+                                mp_last_gesture_time = current_time
+                                mp_history = []
+                                return
             else:
-                mp_prev_x = None
+                is_pinching = False
+                mp_history = []
+                mp_prev_point_x = None
+                mp_prev_point_y = None
             return
 
         # 2. Fallback Mode: OpenCV Motion Trajectory Detector
