@@ -109,9 +109,10 @@ def run_physical_camera_detector():
         )
 
     cap = None
-    for idx in [0, 20, 19, 21, 22, 23, 24, 25, 1, 2]:
-        temp_cap = cv2.VideoCapture(idx)
+    for idx in [20, 0, 19, 1]:
+        temp_cap = cv2.VideoCapture(idx, cv2.CAP_V4L2) if hasattr(cv2, 'CAP_V4L2') else cv2.VideoCapture(idx)
         if temp_cap.isOpened():
+            temp_cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
             ret, test_frame = temp_cap.read()
             if ret and test_frame is not None:
                 cap = temp_cap
@@ -400,9 +401,13 @@ def run_physical_camera_detector():
                 prev_x = None
                 prev_y = None
 
-            cv2.imshow("Raspberry Pi Gesture Detector Preview", frame)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
+            try:
+                cv2.imshow("Raspberry Pi Gesture Detector Preview", frame)
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
+            except Exception:
+                # Headless SSH terminal fallback without Qt/X11 GUI window
+                time.sleep(0.01)
     except Exception as e:
         print(f"[ERROR] Exception in camera loop: {e}")
     finally:
