@@ -85,9 +85,13 @@ def create_status_frame(message):
 
 # Hybrid MediaPipe AI & OpenCV Motion Gesture Engine
 mp_hands_detector = None
+mp_drawing = None
+mp_hands_solution = None
+
 try:
     import mediapipe as mp
     mp_hands_solution = mp.solutions.hands
+    mp_drawing = mp.solutions.drawing_utils
     mp_hands_detector = mp_hands_solution.Hands(
         static_image_mode=False,
         max_num_hands=1,
@@ -95,9 +99,9 @@ try:
         min_tracking_confidence=0.5
     )
     print("[Camera Stream] MediaPipe AI 21-Keypoint Hand Engine loaded successfully into app.py!", flush=True)
-except Exception:
+except Exception as e:
     mp_hands_detector = None
-    print("[Camera Stream] Operating in Pure OpenCV Motion Detection Mode", flush=True)
+    print(f"[Camera Stream] Operating in Pure OpenCV Motion Detection Mode ({e})", flush=True)
 
 mp_history = []
 mp_last_gesture_time = 0
@@ -112,7 +116,7 @@ motion_history = []
 last_motion_gesture_time = 0
 
 def process_motion_gesture(frame):
-    global mp_hands_detector, mp_history, mp_last_gesture_time
+    global mp_hands_detector, mp_drawing, mp_hands_solution, mp_history, mp_last_gesture_time
     global is_pinching, pinch_start_time, mp_last_seek_time
     global mp_prev_point_x, mp_prev_point_y
     global prev_motion_gray, motion_history, last_motion_gesture_time
@@ -130,6 +134,14 @@ def process_motion_gesture(frame):
 
             if results and results.multi_hand_landmarks:
                 for hand_landmarks in results.multi_hand_landmarks:
+                    # DRAW MEDIAPIPE 21 SKELETON JOINTS ON THE LIVE STREAM PREVIEW!
+                    if mp_drawing and mp_hands_solution:
+                        mp_drawing.draw_landmarks(
+                            frame,
+                            hand_landmarks,
+                            mp_hands_solution.HAND_CONNECTIONS
+                        )
+
                     thumb_tip = hand_landmarks.landmark[4]
                     index_tip = hand_landmarks.landmark[8]
                     index_pip = hand_landmarks.landmark[6]
