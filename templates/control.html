@@ -487,13 +487,18 @@
             console.log("Player state sync received:", state);
 
             // Sync track info
-            if (state.trackTitle) trackTitle.textContent = state.trackTitle;
+            if (state.trackTitle && trackTitle.textContent !== state.trackTitle) {
+                trackTitle.textContent = state.trackTitle;
+                remoteCurrentTime = state.currentTime || 0;
+            }
             if (state.trackArtist) trackArtist.textContent = state.trackArtist;
             if (state.trackCover && !trackCover.src.endsWith(state.trackCover)) {
                 trackCover.src = state.trackCover;
             }
             songDuration = state.duration || 0;
-            if (state.currentTime !== undefined) {
+
+            // Only override local timer if incoming server time is valid (>0) or when paused
+            if (state.currentTime !== undefined && (state.currentTime > 0 || !state.isPlaying)) {
                 remoteCurrentTime = state.currentTime;
             }
             isRemotePlaying = !!state.isPlaying;
