@@ -486,13 +486,23 @@
         socket.on('player_state_update', (state) => {
             console.log("Player state sync received:", state);
 
+            // Helper to get URL pathname for strict image comparison
+            function getCleanPath(urlStr) {
+                if (!urlStr) return '';
+                try {
+                    return new URL(urlStr, window.location.href).pathname;
+                } catch(e) {
+                    return urlStr;
+                }
+            }
+
             // Sync track info
             if (state.trackTitle && trackTitle.textContent !== state.trackTitle) {
                 trackTitle.textContent = state.trackTitle;
                 remoteCurrentTime = state.currentTime || 0;
             }
             if (state.trackArtist) trackArtist.textContent = state.trackArtist;
-            if (state.trackCover && !trackCover.src.endsWith(state.trackCover)) {
+            if (state.trackCover && getCleanPath(trackCover.src) !== getCleanPath(state.trackCover)) {
                 trackCover.src = state.trackCover;
             }
             songDuration = state.duration || 0;
