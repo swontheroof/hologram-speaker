@@ -446,12 +446,15 @@ def run_physical_camera_detector():
                 prev_x = None
                 prev_y = None
 
-            try:
-                cv2.imshow("Raspberry Pi Gesture Detector Preview", frame)
-                if cv2.waitKey(1) & 0xFF == ord('q'):
-                    break
-            except Exception:
-                # Headless SSH terminal fallback without Qt/X11 GUI window
+            if os.environ.get('DISPLAY'):
+                try:
+                    cv2.imshow("Raspberry Pi Gesture Detector Preview", frame)
+                    if cv2.waitKey(1) & 0xFF == ord('q'):
+                        break
+                except Exception:
+                    pass
+            else:
+                # Headless SSH mode - no GUI display attached
                 time.sleep(0.01)
     except Exception as e:
         print(f"[ERROR] Exception in camera loop: {e}")
