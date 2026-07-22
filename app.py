@@ -69,14 +69,28 @@ def index():
 def get_songs():
     return jsonify(SONGS)
 
+def create_status_frame(message):
+    """Generate a visual status banner image when camera frame is pending"""
+    try:
+        import numpy as np
+        import cv2
+        img = np.zeros((480, 640, 3), dtype=np.uint8)
+        # Draw status text
+        cv2.putText(img, "Hologram Speaker Camera Stream", (40, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+        cv2.putText(img, message, (40, 260), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        ret, buffer = cv2.imencode('.jpg', img)
+        return buffer.tobytes()
+    except Exception:
+        return b''
+
 def gen_camera_frames():
     """MJPEG Live Camera Streamer supporting Raspberry Pi 5 libcamera nodes (/dev/video20, /dev/video0)"""
     try:
         import cv2
         cap = None
-        # Try index 20 (Raspberry Pi 5) first, then index 0
+        # Try index 20 (Raspberry Pi 5) first, then index 0, with V4L2 backend
         for idx in [20, 0, 19, 1]:
-            temp_cap = cv2.VideoCapture(idx)
+            temp_cap = cv2.VideoCapture(idx, cv2.CAP_V4L2) if hasattr(cv2, 'CAP_V4L2') else cv2.VideoCapture(idx)
             if temp_cap.isOpened():
                 ret, test_frame = temp_cap.read()
                 if ret and test_frame is not None:
@@ -86,12 +100,18 @@ def gen_camera_frames():
                 temp_cap.release()
         
         if not cap or not cap.isOpened():
-            print("[Camera Stream] Cannot open camera device")
+            print("[Camera Stream] Cannot open camera device. Displaying status banner.")
+            status_bytes = create_status_frame("Camera Hardware Not Found / Disconnected")
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + status_bytes + b'\r\n')
             return
 
         while True:
             success, frame = cap.read()
-            if not success:
+            if not success or frame is None:
+                status_bytes = create_status_frame("Waiting for Camera Frame...")
+                yield (b'--frame\r\n'
+                       b'Content-Type: image/jpeg\r\n\r\n' + status_bytes + b'\r\n')
                 break
             ret, buffer = cv2.imencode('.jpg', frame)
             if not ret:
