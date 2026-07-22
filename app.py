@@ -91,7 +91,12 @@ def gen_camera_frames():
     # 1. Try native Raspberry Pi 5 libcamera streamer (rpicam-vid / libcamera-vid)
     cam_cmd = shutil.which("rpicam-vid") or shutil.which("libcamera-vid")
     if cam_cmd:
+        proc = None
         try:
+            # Kill any previous background camera process so device isn't busy
+            subprocess.run(["pkill", "-9", "-f", "rpicam-vid"], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+            subprocess.run(["pkill", "-9", "-f", "libcamera-vid"], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+            
             print(f"[Camera Stream] Starting Pi 5 libcamera process: {cam_cmd}")
             proc = subprocess.Popen(
                 [cam_cmd, "-t", "0", "--inline", "--width", "640", "--height", "480", "--codec", "mjpeg", "--framerate", "30", "-o", "-"],
@@ -111,10 +116,16 @@ def gen_camera_frames():
                     buffer = buffer[b+2:]
                     yield (b'--frame\r\n'
                            b'Content-Type: image/jpeg\r\n\r\n' + jpg + b'\r\n')
-            proc.terminate()
-            return
         except Exception as e:
             print(f"[Camera Stream rpicam-vid Error] {e}")
+        finally:
+            if proc:
+                try:
+                    proc.kill()
+                    proc.wait(timeout=1)
+                except Exception:
+                    pass
+            return
 
     # 2. Fallback to OpenCV V4L2 device probing
     try:
