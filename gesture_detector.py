@@ -108,19 +108,44 @@ def run_physical_camera_detector():
             min_tracking_confidence=0.6
         )
 
-    cap = None
-    for idx in [20, 0, 19, 1]:
-        temp_cap = cv2.VideoCapture(idx, cv2.CAP_V4L2) if hasattr(cv2, 'CAP_V4L2') else cv2.VideoCapture(idx)
-        if temp_cap.isOpened():
-            temp_cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
-            ret, test_frame = temp_cap.read()
-            if ret and test_frame is not None:
-                cap = temp_cap
-                print(f"[Camera Detector] Successfully opened camera device index: {idx}")
-                break
-            temp_cap.release()
+    import subprocess
+    import shutil
+    import numpy as np
 
-    if not cap or not cap.isOpened():
+    # Kill any previous camera processes
+    subprocess.run(["pkill", "-9", "-f", "rpicam-vid"], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+    subprocess.run(["pkill", "-9", "-f", "libcamera-vid"], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+
+    cam_cmd = shutil.which("rpicam-vid") or shutil.which("libcamera-vid")
+    use_rpicam = False
+    proc = None
+
+    if cam_cmd:
+        try:
+            print(f"[Camera Detector] Starting Pi 5 libcamera stream for gesture detection: {cam_cmd}")
+            proc = subprocess.Popen(
+                [cam_cmd, "-t", "0", "--inline", "--width", "640", "--height", "480", "--codec", "mjpeg", "--framerate", "30", "-o", "-"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL
+            )
+            use_rpicam = True
+        except Exception as e:
+            print(f"[Camera Detector rpicam-vid Error] {e}")
+
+    cap = None
+    if not use_rpicam:
+        for idx in [20, 0, 19, 1]:
+            temp_cap = cv2.VideoCapture(idx, cv2.CAP_V4L2) if hasattr(cv2, 'CAP_V4L2') else cv2.VideoCapture(idx)
+            if temp_cap.isOpened():
+                temp_cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
+                ret, test_frame = temp_cap.read()
+                if ret and test_frame is not None:
+                    cap = temp_cap
+                    print(f"[Camera Detector] Successfully opened camera device index: {idx}")
+                    break
+                temp_cap.release()
+
+    if not use_rpicam and (not cap or not cap.isOpened()):
         print("[ERROR] Cannot open webcam camera on any index.")
         return
 
@@ -147,10 +172,30 @@ def run_physical_camera_detector():
     tracking_loss_frames = 0
     pose_loss_frames = 0
 
+    buffer = b""
     try:
-        while cap.isOpened():
-            ret, frame = cap.read()
-            if not ret:
+        while True:
+            frame = None
+            if use_rpicam and proc:
+                chunk = proc.stdout.read(4096)
+                if not chunk:
+                    break
+                buffer += chunk
+                a = buffer.find(b'\xff\xd8')
+                b = buffer.find(b'\xff\xd9')
+                if a != -1 and b != -1:
+                    jpg = buffer[a:b+2]
+                    buffer = buffer[b+2:]
+                    frame = cv2.imdecode(np.frombuffer(jpg, dtype=np.uint8), cv2.IMREAD_COLOR)
+                    if frame is None:
+                        continue
+                else:
+                    continue
+            elif cap and cap.isOpened():
+                ret, frame = cap.read()
+                if not ret or frame is None:
+                    break
+            else:
                 break
 
             # Flip the image horizontally for mirror view
@@ -411,7 +456,13 @@ def run_physical_camera_detector():
     except Exception as e:
         print(f"[ERROR] Exception in camera loop: {e}")
     finally:
-        cap.release()
+        if cap:
+            cap.release()
+        if proc:
+            try:
+                proc.kill()
+            except Exception:
+                pass
         cv2.destroyAllWindows()
 
 if __name__ == '__main__':
