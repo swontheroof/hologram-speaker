@@ -70,12 +70,12 @@ def get_songs():
     return jsonify(SONGS)
 
 def gen_camera_frames():
-    """MJPEG Live Camera Streamer supporting Raspberry Pi 5 libcamera nodes (/dev/video20, /dev/video19, etc.)"""
+    """MJPEG Live Camera Streamer supporting Raspberry Pi 5 libcamera nodes (/dev/video20, /dev/video0)"""
     try:
         import cv2
         cap = None
-        # Auto-probe camera device indices for Raspberry Pi 5 / libcamera V4L2 nodes
-        for idx in [0, 20, 19, 21, 22, 23, 24, 25, 1, 2]:
+        # Try index 20 (Raspberry Pi 5) first, then index 0
+        for idx in [20, 0, 19, 1]:
             temp_cap = cv2.VideoCapture(idx)
             if temp_cap.isOpened():
                 ret, test_frame = temp_cap.read()
@@ -86,7 +86,7 @@ def gen_camera_frames():
                 temp_cap.release()
         
         if not cap or not cap.isOpened():
-            print("[Camera Stream] Cannot open any camera device")
+            print("[Camera Stream] Cannot open camera device")
             return
 
         while True:
