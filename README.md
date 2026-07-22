@@ -69,8 +69,21 @@ python3 gesture_detector.py
 ### 0. 의존성 패키지 설치 (라즈베리파이 4/5 기준)
 라즈베리파이에서 OpenCV 및 가상환경을 정상적으로 구동하기 위해 터미널에서 아래 필수 시스템 패키지 설치 명령을 수행합니다:
 ```bash
+ssh mingyu@mingyu.local
+
+cd ~/hologram-web
+
 sudo apt update
 sudo apt install -y python3-pip python3-venv python3-dev libgl1 libglib2.0-0
+
+python3 -m venv .venv
+source .venv/bin/activate
+
+pip install —upgrade pip
+pip install flask flask-socketio
+pip install opencv-python mediapipe python-socketio
+
+python3 app.py
 ```
 
 ### 1. 디스플레이 & 피라미드 아크릴

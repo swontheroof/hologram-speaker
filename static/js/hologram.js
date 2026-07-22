@@ -34,10 +34,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const gestureStatus = document.getElementById('gesture-status') || document.createElement('p');
     const debugCanvas = document.getElementById('gesture-canvas') || { width: 200, height: 150 };
     const debugCtx = debugCanvas.getContext ? debugCanvas.getContext('2d') : {
-        clearRect: () => {}, save: () => {}, restore: () => {},
-        scale: () => {}, translate: () => {}, drawImage: () => {},
-        beginPath: () => {}, arc: () => {}, fill: () => {}, stroke: () => {},
-        closePath: () => {}, lineTo: () => {}, moveTo: () => {}
+        clearRect: () => { }, save: () => { }, restore: () => { },
+        scale: () => { }, translate: () => { }, drawImage: () => { },
+        beginPath: () => { }, arc: () => { }, fill: () => { }, stroke: () => { },
+        closePath: () => { }, lineTo: () => { }, moveTo: () => { }
     };
     const videoElement = document.getElementById('webcam-video') || document.createElement('video');
 
