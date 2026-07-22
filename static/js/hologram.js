@@ -880,44 +880,51 @@ document.addEventListener('DOMContentLoaded', () => {
             visualizerRing.position.y = floatOffset;
         }
 
-        // C. Divide single WebGL context into 4 Viewports (North, South, East, West)
+        // C. Divide WebGL context based on View Mode (QUAD 4-Face vs SINGLE 1-Face East)
         const w = window.innerWidth;
         const h = window.innerHeight;
 
         const cx = w / 2;
         const cy = h / 2;
 
-        // Size of the square viewport box for each of the 4 projection faces
-        const viewSize = Math.min(w, h) * 0.28;
-
         renderer.setScissorTest(false);
         renderer.clear();
         renderer.setScissorTest(true);
 
-        // 1. SOUTH (Bottom view)
-        renderer.setViewport(cx - viewSize / 2, cy - viewSize * 1.5, viewSize, viewSize);
-        renderer.setScissor(cx - viewSize / 2, cy - viewSize * 1.5, viewSize, viewSize);
-        renderer.setScissorTest(true);
-        renderer.render(scene, cameraSouth);
+        if (window.hologramViewMode === 'SINGLE_EAST') {
+            // Single 1-Face Large View (East Side Enlarged Centered)
+            const singleSize = Math.min(w, h) * 0.85;
+            renderer.setViewport((w - singleSize) / 2, (h - singleSize) / 2, singleSize, singleSize);
+            renderer.setScissor((w - singleSize) / 2, (h - singleSize) / 2, singleSize, singleSize);
+            renderer.render(scene, cameraEast);
+        } else {
+            // Quad 4-Face Pyramid Mode (Default)
+            const viewSize = Math.min(w, h) * 0.28;
 
-        // 2. NORTH (Top view - upside down)
-        renderer.setViewport(cx - viewSize / 2, cy + viewSize * 0.5, viewSize, viewSize);
-        renderer.setScissor(cx - viewSize / 2, cy + viewSize * 0.5, viewSize, viewSize);
-        renderer.render(scene, cameraNorth);
+            // 1. SOUTH (Bottom view)
+            renderer.setViewport(cx - viewSize / 2, cy - viewSize * 1.5, viewSize, viewSize);
+            renderer.setScissor(cx - viewSize / 2, cy - viewSize * 1.5, viewSize, viewSize);
+            renderer.render(scene, cameraSouth);
 
-        // 3. WEST (Left view)
-        renderer.setViewport(cx - viewSize * 1.5, cy - viewSize / 2, viewSize, viewSize);
-        renderer.setScissor(cx - viewSize * 1.5, cy - viewSize / 2, viewSize, viewSize);
-        renderer.render(scene, cameraWest);
+            // 2. NORTH (Top view)
+            renderer.setViewport(cx - viewSize / 2, cy + viewSize * 0.5, viewSize, viewSize);
+            renderer.setScissor(cx - viewSize / 2, cy + viewSize * 0.5, viewSize, viewSize);
+            renderer.render(scene, cameraNorth);
 
-        // 4. EAST (Right view)
-        renderer.setViewport(cx + viewSize * 0.5, cy - viewSize / 2, viewSize, viewSize);
-        renderer.setScissor(cx + viewSize * 0.5, cy - viewSize / 2, viewSize, viewSize);
-        renderer.render(scene, cameraEast);
+            // 3. WEST (Left view)
+            renderer.setViewport(cx - viewSize * 1.5, cy - viewSize / 2, viewSize, viewSize);
+            renderer.setScissor(cx - viewSize * 1.5, cy - viewSize / 2, viewSize, viewSize);
+            renderer.render(scene, cameraWest);
 
-        // Draw crosshair alignment guides if enabled
-        if (showGuides) {
-            drawCalibrationGuides(cx, cy, viewSize);
+            // 4. EAST (Right view)
+            renderer.setViewport(cx + viewSize * 0.5, cy - viewSize / 2, viewSize, viewSize);
+            renderer.setScissor(cx + viewSize * 0.5, cy - viewSize / 2, viewSize, viewSize);
+            renderer.render(scene, cameraEast);
+
+            // Draw crosshair alignment guides if enabled
+            if (showGuides) {
+                drawCalibrationGuides(cx, cy, viewSize);
+            }
         }
     }
 
@@ -1903,6 +1910,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Remote settings synchronization
     socket.on('remote_setting_trigger', (data) => {
         console.log("Remote Setting Trigger received:", data);
+        if (data.viewMode !== undefined) {
+            window.hologramViewMode = data.viewMode;
+            console.log("Hologram View Mode switched to:", window.hologramViewMode);
+            syncPlayerState();
+        }
         if (data.friction !== undefined) {
             frictionSlider.value = data.friction;
             friction = parseFloat(data.friction);
@@ -1941,6 +1953,12 @@ document.addEventListener('DOMContentLoaded', () => {
             isPlaying: isPlaying,
             currentSongIndex: currentSongIndex,
             currentTime: audio.currentTime || 0,
+            duration: audio.duration || 0,
+            trackTitle: trackTitle.textContent,
+            trackArtist: trackArtist.textContent,
+            trackCover: dashboardCover.src,
+            interactionMode: interactionMode,
+            hologramViewMode: window.hologramViewMode || 'QUAD',
             duration: audio.duration || 0,
             trackTitle: trackTitle.textContent,
             trackArtist: trackArtist.textContent,

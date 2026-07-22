@@ -397,6 +397,13 @@
                 <label for="toggle-webcam">본체 웹캠 인식 켜기 (Local Cam)</label>
                 <input type="checkbox" id="toggle-webcam">
             </div>
+
+            <div class="setting-row" style="margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center;">
+                <label style="font-weight: 600;">📐 홀로그램 화면 모드</label>
+                <button type="button" id="btn-toggle-view-mode" style="background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; border: none; padding: 8px 14px; border-radius: 8px; font-weight: 600; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 12px rgba(99,102,241,0.3);">
+                    📐 4면 피라미드 모드
+                </button>
+            </div>
         </section>
 
         <!-- Dynamic Monitor Console -->
@@ -507,9 +514,11 @@
             }
             songDuration = state.duration || 0;
 
-            // Only override local timer if incoming server time is valid (>0) or when paused
             if (state.currentTime !== undefined && (state.currentTime > 0 || !state.isPlaying)) {
                 remoteCurrentTime = state.currentTime;
+            }
+            if (state.hologramViewMode) {
+                updateViewModeUI(state.hologramViewMode);
             }
             isRemotePlaying = !!state.isPlaying;
 
@@ -619,7 +628,28 @@
         toggleGuides.addEventListener('change', emitSettings);
         toggleWebcam.addEventListener('change', emitSettings);
 
-        // 5. Live Camera Stream preview toggle
+        // 5. Hologram View Mode Toggle (QUAD vs SINGLE_EAST)
+        let currentHologramViewMode = 'QUAD';
+        const btnToggleViewMode = document.getElementById('btn-toggle-view-mode');
+
+        function updateViewModeUI(mode) {
+            currentHologramViewMode = mode;
+            if (mode === 'SINGLE_EAST') {
+                btnToggleViewMode.textContent = '🖥️ 1면 단일 대형 모드 (East)';
+                btnToggleViewMode.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+            } else {
+                btnToggleViewMode.textContent = '📐 4면 피라미드 모드 (Quad)';
+                btnToggleViewMode.style.background = 'linear-gradient(135deg, #6366f1, #8b5cf6)';
+            }
+        }
+
+        btnToggleViewMode.addEventListener('click', () => {
+            const nextMode = (currentHologramViewMode === 'QUAD') ? 'SINGLE_EAST' : 'QUAD';
+            updateViewModeUI(nextMode);
+            socket.emit('remote_setting_change', { viewMode: nextMode });
+        });
+
+        // 6. Live Camera Stream preview toggle
         const btnToggleCamStream = document.getElementById('btn-toggle-camera-stream');
         const camStreamContainer = document.getElementById('camera-stream-container');
         const camStreamImg = document.getElementById('camera-stream-img');
