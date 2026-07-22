@@ -1,7 +1,7 @@
 import os
 import json
 import urllib.request
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, Response
 from flask_socketio import SocketIO, emit
 
 # Manually load .env file if it exists to avoid python-dotenv dependency
@@ -68,6 +68,45 @@ def index():
 @app.route('/api/songs', methods=['GET'])
 def get_songs():
     return jsonify(SONGS)
+
+def gen_camera_frames():
+    """MJPEG Live Camera Streamer supporting Raspberry Pi 5 libcamera nodes (/dev/video20, /dev/video19, etc.)"""
+    try:
+        import cv2
+        cap = None
+        # Auto-probe camera device indices for Raspberry Pi 5 / libcamera V4L2 nodes
+        for idx in [0, 20, 19, 21, 22, 23, 24, 25, 1, 2]:
+            temp_cap = cv2.VideoCapture(idx)
+            if temp_cap.isOpened():
+                ret, test_frame = temp_cap.read()
+                if ret and test_frame is not None:
+                    cap = temp_cap
+                    print(f"[Camera Stream] Successfully opened camera device index: {idx}")
+                    break
+                temp_cap.release()
+        
+        if not cap or not cap.isOpened():
+            print("[Camera Stream] Cannot open any camera device")
+            return
+
+        while True:
+            success, frame = cap.read()
+            if not success:
+                break
+            ret, buffer = cv2.imencode('.jpg', frame)
+            if not ret:
+                continue
+            frame_bytes = buffer.tobytes()
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+        cap.release()
+    except Exception as e:
+        print(f"[Camera Stream Error] {e}")
+
+@app.route('/video_feed')
+def video_feed():
+    """Live Camera MJPEG Video Stream Route"""
+    return Response(gen_camera_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 @app.route('/api/log', methods=['POST'])
 def client_log():

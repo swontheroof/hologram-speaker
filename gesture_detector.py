@@ -85,27 +85,42 @@ def run_physical_camera_detector():
       2. Run: python3 gesture_detector.py --camera
     """
     print("[HW Detector] Camera mode starting... Importing OpenCV and MediaPipe...")
+    has_mediapipe = False
     try:
         import cv2
-        import mediapipe as mp
+        try:
+            import mediapipe as mp
+            has_mediapipe = True
+        except ImportError:
+            print("\n[HW Detector] MediaPipe not found. Operating in Pure OpenCV Motion Detection mode!")
     except ImportError:
-        print("\n[ERROR] OpenCV or MediaPipe is not installed.")
-        print("Please install them using: pip install opencv-python mediapipe")
+        print("\n[ERROR] OpenCV is not installed. Please run: pip install opencv-python")
         return
 
-    mp_hands = mp.solutions.hands
-    # model_complexity=0 uses the Lite model, which is highly recommended for Raspberry Pi 5 performance
-    hands = mp_hands.Hands(
-        static_image_mode=False,
-        max_num_hands=1,
-        model_complexity=0,
-        min_detection_confidence=0.6,
-        min_tracking_confidence=0.6
-    )
+    hands = None
+    if has_mediapipe:
+        mp_hands = mp.solutions.hands
+        hands = mp_hands.Hands(
+            static_image_mode=False,
+            max_num_hands=1,
+            model_complexity=0,
+            min_detection_confidence=0.6,
+            min_tracking_confidence=0.6
+        )
 
-    cap = cv2.VideoCapture(0)
-    if not cap.isOpened():
-        print("[ERROR] Cannot open webcam camera.")
+    cap = None
+    for idx in [0, 20, 19, 21, 22, 23, 24, 25, 1, 2]:
+        temp_cap = cv2.VideoCapture(idx)
+        if temp_cap.isOpened():
+            ret, test_frame = temp_cap.read()
+            if ret and test_frame is not None:
+                cap = temp_cap
+                print(f"[Camera Detector] Successfully opened camera device index: {idx}")
+                break
+            temp_cap.release()
+
+    if not cap or not cap.isOpened():
+        print("[ERROR] Cannot open webcam camera on any index.")
         return
 
     print("\n" + "="*50)
@@ -137,15 +152,17 @@ def run_physical_camera_detector():
             if not ret:
                 break
 
-            # Flip the image horizontally for mirror view, convert BGR to RGB
+            # Flip the image horizontally for mirror view
             frame = cv2.flip(frame, 1)
             h, w, _ = frame.shape
-            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            results = hands.process(rgb_frame)
 
             current_time = time.time()
+            results = None
+            if has_mediapipe:
+                rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                results = hands.process(rgb_frame)
 
-            if results.multi_hand_landmarks:
+            if results and results.multi_hand_landmarks:
                 tracking_loss_frames = 0
                 for hand_landmarks in results.multi_hand_landmarks:
                     # Index tip (8), Thumb tip (4), Wrist (0)

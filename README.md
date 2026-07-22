@@ -70,8 +70,10 @@ python3 gesture_detector.py
 라즈베리파이에서 OpenCV 및 가상환경을 정상적으로 구동하기 위해 터미널에서 아래 필수 시스템 패키지 설치 명령을 수행합니다:
 ```bash
 ssh mingyu@mingyu.local
+ssh mingyu@10.121.135.214
 
-cd ~/hologram-web
+
+cd /holo
 
 sudo apt update
 sudo apt install -y python3-pip python3-venv python3-dev libgl1 libglib2.0-0
@@ -80,7 +82,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 
 pip install --upgrade pip
-pip install flask flask-socketio python-socketio opencv-python
+pip install flask flask-socketio python-socketio opencv-python requests websocket-client
 
 python3 app.py
 ```
@@ -99,5 +101,3 @@ python3 app.py
 * **무선 원격 제어 페이지 접속**: 스마트폰이나 태블릿 등 외부 장치 브라우저로 `http://<라즈베리파이-IP>:5001/control`에 연결합니다.
   * 본체에서 돌아가는 실시간 곡명, 가수명, 앨범아트 회전 싱크 및 오디오 진행 시간(SeekBar) 정보가 매초 자동 갱신됩니다.
   * 리모컨에서 원격 재생/일시정지/탐색/곡넘김 조작을 수행하고, 감도 슬라이더 및 제미나이 텍스트 프롬프트를 원격 무선 전송하여 본체 동작을 편하게 테스트할 수 있습니다.
-
-### 444
