@@ -892,10 +892,15 @@ document.addEventListener('DOMContentLoaded', () => {
         renderer.setScissorTest(true);
 
         if (window.hologramViewMode === 'SINGLE_EAST') {
-            // Single 1-Face Large View (East Side Enlarged Centered)
-            const singleSize = Math.min(w, h) * 0.85;
-            renderer.setViewport((w - singleSize) / 2, (h - singleSize) / 2, singleSize, singleSize);
-            renderer.setScissor((w - singleSize) / 2, (h - singleSize) / 2, singleSize, singleSize);
+            // Single 1-Face Mode (East View shifted to right side with custom size)
+            const scale = window.singleModeScale || 0.48; // default 48% size
+            const offsetXRatio = (window.singleModeOffsetX !== undefined) ? window.singleModeOffsetX : 0.30; // shifted to East side
+            const singleSize = Math.min(w, h) * scale;
+            const vx = cx + (Math.min(w, h) * offsetXRatio) - (singleSize / 2);
+            const vy = cy - (singleSize / 2);
+
+            renderer.setViewport(vx, vy, singleSize, singleSize);
+            renderer.setScissor(vx, vy, singleSize, singleSize);
             renderer.render(scene, cameraEast);
         } else {
             // Quad 4-Face Pyramid Mode (Default)
@@ -1914,6 +1919,12 @@ document.addEventListener('DOMContentLoaded', () => {
             window.hologramViewMode = data.viewMode;
             console.log("Hologram View Mode switched to:", window.hologramViewMode);
             syncPlayerState();
+        }
+        if (data.singleScale !== undefined) {
+            window.singleModeScale = parseFloat(data.singleScale);
+        }
+        if (data.singleOffsetX !== undefined) {
+            window.singleModeOffsetX = parseFloat(data.singleOffsetX);
         }
         if (data.friction !== undefined) {
             frictionSlider.value = data.friction;
