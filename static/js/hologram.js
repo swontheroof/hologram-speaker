@@ -438,6 +438,7 @@ document.addEventListener('DOMContentLoaded', () => {
     btnPrev.addEventListener('click', () => prevSong());
     btnNext.addEventListener('click', () => nextSong());
 
+    let lastSyncTime = 0;
     audio.addEventListener('timeupdate', () => {
         if (audio.duration) {
             const pct = (audio.currentTime / audio.duration) * 100;
@@ -451,6 +452,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
             currentTimeEl.textContent = `${curMins}:${curSecs}`;
             durationEl.textContent = `${durMins}:${durSecs}`;
+
+            // Sync with remote control (max 1 sync per second)
+            const now = Date.now();
+            if (now - lastSyncTime > 900) {
+                lastSyncTime = now;
+                if (typeof syncPlayerState === 'function') {
+                    syncPlayerState();
+                }
+            }
         }
     });
 

@@ -85,47 +85,57 @@ def create_status_frame(message):
 
 # Integrated Motion Gesture Detector for Pi Camera
 prev_motion_gray = None
+prev_motion_cx = None
 last_motion_gesture_time = 0
 
 def process_motion_gesture(frame):
-    global prev_motion_gray, last_motion_gesture_time
+    global prev_motion_gray, prev_motion_cx, last_motion_gesture_time
     try:
         import cv2
         import numpy as np
         import time
 
         current_time = time.time()
-        if current_time - last_motion_gesture_time < 0.9: # 0.9s gesture cooldown
+        if current_time - last_motion_gesture_time < 0.7: # 0.7s cooldown
             return
 
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        gray = cv2.GaussianBlur(gray, (21, 21), 0)
+        gray = cv2.GaussianBlur(gray, (15, 15), 0)
 
         if prev_motion_gray is None or prev_motion_gray.shape != gray.shape:
             prev_motion_gray = gray
             return
 
         frame_diff = cv2.absdiff(prev_motion_gray, gray)
-        thresh = cv2.threshold(frame_diff, 25, 255, cv2.THRESH_BINARY)[1]
+        thresh = cv2.threshold(frame_diff, 20, 255, cv2.THRESH_BINARY)[1]
         thresh = cv2.dilate(thresh, None, iterations=2)
 
         contours, _ = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         prev_motion_gray = gray
 
-        motion_area = sum(cv2.contourArea(c) for c in contours if cv2.contourArea(c) > 3000)
-        if motion_area > 7000:
+        motion_area = sum(cv2.contourArea(c) for c in contours if cv2.contourArea(c) > 1500)
+        if motion_area > 4000:
             M = cv2.moments(thresh)
             if M["m00"] != 0:
                 cx = int(M["m10"] / M["m00"])
-                w = frame.shape[1]
-                if cx > int(w * 0.65):
-                    print("[Camera Gesture] Motion Swipe Right detected! -> Next Track", flush=True)
-                    socketio.emit('hardware_gesture', {'type': 'next'})
-                    last_motion_gesture_time = current_time
-                elif cx < int(w * 0.35):
-                    print("[Camera Gesture] Motion Swipe Left detected! -> Previous Track", flush=True)
-                    socketio.emit('hardware_gesture', {'type': 'prev'})
-                    last_motion_gesture_time = current_time
+                if prev_motion_cx is not None:
+                    dx = cx - prev_motion_cx
+                    # Require minimum directional movement displacement (dx)
+                    if dx > 45: # Moving right
+                        print("[Camera Gesture] Precision Swipe Right detected! -> Next Track", flush=True)
+                        socketio.emit('gesture_trigger', {'type': 'next'})
+                        last_motion_gesture_time = current_time
+                        prev_motion_cx = None
+                        return
+                    elif dx < -45: # Moving left
+                        print("[Camera Gesture] Precision Swipe Left detected! -> Previous Track", flush=True)
+                        socketio.emit('gesture_trigger', {'type': 'prev'})
+                        last_motion_gesture_time = current_time
+                        prev_motion_cx = None
+                        return
+                prev_motion_cx = cx
+        else:
+            prev_motion_cx = None
     except Exception:
         pass
 

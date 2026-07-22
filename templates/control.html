@@ -469,15 +469,34 @@
             monitorConsole.textContent = '서버와의 연결이 끊어졌습니다.';
         });
 
+        let remoteCurrentTime = 0;
+        let isRemotePlaying = false;
+
+        // Smooth local playback progression timer for remote control UI
+        setInterval(() => {
+            if (isRemotePlaying && !isUserSeeking && songDuration > 0) {
+                remoteCurrentTime = Math.min(songDuration, remoteCurrentTime + 1);
+                const percentage = (remoteCurrentTime / songDuration) * 100;
+                seekBar.value = percentage;
+                currentTimeEl.textContent = formatTime(remoteCurrentTime);
+            }
+        }, 1000);
+
         // 1. Listen for player state sync from the main hologram speaker screen
         socket.on('player_state_update', (state) => {
             console.log("Player state sync received:", state);
 
             // Sync track info
-            trackTitle.textContent = state.trackTitle;
-            trackArtist.textContent = state.trackArtist;
-            trackCover.src = state.trackCover;
-            songDuration = state.duration;
+            if (state.trackTitle) trackTitle.textContent = state.trackTitle;
+            if (state.trackArtist) trackArtist.textContent = state.trackArtist;
+            if (state.trackCover && !trackCover.src.endsWith(state.trackCover)) {
+                trackCover.src = state.trackCover;
+            }
+            songDuration = state.duration || 0;
+            if (state.currentTime !== undefined) {
+                remoteCurrentTime = state.currentTime;
+            }
+            isRemotePlaying = !!state.isPlaying;
 
             // Sync play state
             if (state.isPlaying) {
@@ -489,11 +508,11 @@
             }
 
             // Sync seek bar (only if user is not actively dragging the remote slider)
-            if (!isUserSeeking && state.duration > 0) {
-                const percentage = (state.currentTime / state.duration) * 100;
+            if (!isUserSeeking && songDuration > 0) {
+                const percentage = (remoteCurrentTime / songDuration) * 100;
                 seekBar.value = percentage;
-                currentTimeEl.textContent = formatTime(state.currentTime);
-                durationEl.textContent = formatTime(state.duration);
+                currentTimeEl.textContent = formatTime(remoteCurrentTime);
+                durationEl.textContent = formatTime(songDuration);
             }
 
             // Sync console display
