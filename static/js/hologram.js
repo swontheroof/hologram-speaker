@@ -387,7 +387,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function playSong() {
         setupAudioContext();
+        if (audioCtx && audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
         audio.play().then(() => {
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
             isPlaying = true;
             btnPlay.textContent = '⏸️';
             albumCoverContainer.style.animationPlayState = 'running';
@@ -431,7 +437,16 @@ document.addEventListener('DOMContentLoaded', () => {
             sourceNode.connect(analyser);
             analyser.connect(audioCtx.destination);
         }
+        if (audioCtx && audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
     }
+
+    window.addEventListener('click', () => {
+        if (audioCtx && audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+    });
 
     // Audio player event listeners
     btnPlay.addEventListener('click', togglePlay);
