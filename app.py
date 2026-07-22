@@ -154,14 +154,17 @@ def process_motion_gesture(frame):
                         curr_px = 1.0 - index_tip.x # Mirrored X
                         curr_py = index_tip.y
                         if mp_prev_point_x is not None and mp_prev_point_y is not None:
-                            dx = curr_px - mp_prev_point_x
-                            dy = curr_py - mp_prev_point_y
-                            if abs(dx) > 0.002 or abs(dy) > 0.002:
-                                print(f"[Camera Gesture - MediaPipe AI] 3D Cube Rotation (dx: {dx:.3f}, dy: {dy:.3f})", flush=True)
+                            raw_dx = curr_px - mp_prev_point_x
+                            raw_dy = curr_py - mp_prev_point_y
+                            # Clamp delta values so 3D cube never spins wildly out of control!
+                            dx = max(-0.03, min(0.03, raw_dx)) * 1.2
+                            dy = max(-0.03, min(0.03, raw_dy)) * 1.2
+                            if abs(raw_dx) > 0.002 or abs(raw_dy) > 0.002:
+                                print(f"[Camera Gesture - MediaPipe AI] Gentle 3D Cube Rotation (dx: {dx:.3f}, dy: {dy:.3f})", flush=True)
                                 socketio.emit('gesture_trigger', {
                                     'type': 'rotate',
-                                    'dx': dx * 10.0,
-                                    'dy': dy * 10.0,
+                                    'dx': dx,
+                                    'dy': dy,
                                     'x': curr_px,
                                     'y': curr_py,
                                     'touch': True
@@ -200,7 +203,7 @@ def process_motion_gesture(frame):
                                 return
 
                     # --- 3. OPEN HAND SWIPE DETECTION (Next/Prev Song) ---
-                    if current_time - mp_last_gesture_time < 0.75:
+                    if current_time - mp_last_gesture_time < 0.65:
                         mp_history = []
                         return
 
@@ -208,18 +211,19 @@ def process_motion_gesture(frame):
                     if len(mp_history) > 6:
                         mp_history.pop(0)
 
-                    if len(mp_history) >= 3:
+                    if len(mp_history) >= 2:
                         dx_total = mp_history[-1][0] - mp_history[0][0]
                         dt_total = mp_history[-1][1] - mp_history[0][1]
 
-                        if 0.06 <= dt_total <= 0.6:
-                            if dx_total > 0.08:
+                        if 0.04 <= dt_total <= 0.65:
+                            # Higher sensitivity threshold (0.05 instead of 0.08)
+                            if dx_total > 0.05: # Swipe Right across camera
                                 print("[Camera Gesture - MediaPipe AI] Swipe Right detected! -> Next Track", flush=True)
                                 socketio.emit('gesture_trigger', {'type': 'next'})
                                 mp_last_gesture_time = current_time
                                 mp_history = []
                                 return
-                            elif dx_total < -0.08:
+                            elif dx_total < -0.05: # Swipe Left across camera
                                 print("[Camera Gesture - MediaPipe AI] Swipe Left detected! -> Previous Track", flush=True)
                                 socketio.emit('gesture_trigger', {'type': 'prev'})
                                 mp_last_gesture_time = current_time
@@ -321,6 +325,7 @@ def gen_camera_frames():
                 stderr=subprocess.DEVNULL
             )
             buffer = b""
+            frame_counter = 0
             while True:
                 chunk = proc.stdout.read(4096)
                 if not chunk:
@@ -332,10 +337,12 @@ def gen_camera_frames():
                     jpg = buffer[a:b+2]
                     buffer = buffer[b+2:]
                     
-                    # Analyze MediaPipe AI motion gesture in real-time
-                    frame_decoded = cv2.imdecode(np.frombuffer(jpg, dtype=np.uint8), cv2.IMREAD_COLOR)
-                    if frame_decoded is not None:
-                        process_motion_gesture(frame_decoded)
+                    frame_counter += 1
+                    # Analyze MediaPipe AI motion gesture on alternating frames (15 FPS AI, 30 FPS video)
+                    if frame_counter % 2 == 0:
+                        frame_decoded = cv2.imdecode(np.frombuffer(jpg, dtype=np.uint8), cv2.IMREAD_COLOR)
+                        if frame_decoded is not None:
+                            process_motion_gesture(frame_decoded)
 
                     yield (b'--frame\r\n'
                            b'Content-Type: image/jpeg\r\n\r\n' + jpg + b'\r\n')
