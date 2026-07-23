@@ -450,6 +450,12 @@ document.addEventListener('DOMContentLoaded', () => {
     btnPrev.addEventListener('click', () => prevSong());
     btnNext.addEventListener('click', () => nextSong());
 
+    // Auto play next track when current song finishes
+    audio.addEventListener('ended', () => {
+        console.log("[Audio Engine] Song finished. Auto advancing to next track...");
+        nextSong(true);
+    });
+
     let lastSyncTime = 0;
     audio.addEventListener('timeupdate', () => {
         if (audio.duration) {
@@ -793,10 +799,16 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // Smoothly interpolate current scale to target scale (animation transition)
+        // Smoothly interpolate current scale to target scale while strictly preserving Z-axis thickness ratio
         const scaleSpeed = isPlaying ? 0.08 : 0.04; // swell up faster, shrink down slightly slower
-        const currentScale = hologramCube.scale.x + (targetScale * targetCubeScale - hologramCube.scale.x) * scaleSpeed;
-        hologramCube.scale.set(currentScale, currentScale, currentScale);
+        const thickRatio = (window.targetCubeThickness !== undefined) ? window.targetCubeThickness : 1.0;
+        
+        const baseTarget = targetScale * targetCubeScale;
+        const currentScaleX = hologramCube.scale.x + (baseTarget - hologramCube.scale.x) * scaleSpeed;
+        const currentScaleY = hologramCube.scale.y + (baseTarget - hologramCube.scale.y) * scaleSpeed;
+        const currentScaleZ = hologramCube.scale.z + (baseTarget * thickRatio - hologramCube.scale.z) * scaleSpeed;
+
+        hologramCube.scale.set(currentScaleX, currentScaleY, currentScaleZ);
 
         hologramCube.position.x = 0;
         hologramCube.position.z = 0;
@@ -2011,17 +2023,16 @@ document.addEventListener('DOMContentLoaded', () => {
             toggleGuideLines();
         }
         if (data.key === 'cube_settings') {
+            if (data.thickness !== undefined) {
+                window.targetCubeThickness = parseFloat(data.thickness);
+            }
             if (data.scale !== undefined) {
                 targetCubeScale = parseFloat(data.scale);
-                const thickVal = (data.thickness !== undefined) ? parseFloat(data.thickness) : 1.0;
-                if (hologramCube) hologramCube.scale.set(targetCubeScale, targetCubeScale, targetCubeScale * thickVal);
-            }
-            if (data.thickness !== undefined && data.scale === undefined) {
-                const scaleVal = targetCubeScale || 1.0;
-                if (hologramCube) hologramCube.scale.set(scaleVal, scaleVal, scaleVal * parseFloat(data.thickness));
             }
             if (data.spinSpeed !== undefined) {
                 targetRotVelY = parseFloat(data.spinSpeed);
+                rotVelY = targetRotVelY;
+            }
                 rotVelY = targetRotVelY;
             }
             if (data.friction !== undefined) {
