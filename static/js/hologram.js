@@ -1993,8 +1993,14 @@ document.addEventListener('DOMContentLoaded', () => {
             prevSong(true);
             gestureStatus.textContent = 'HW 제스처: 이전 곡 재생';
         } else if (actionType === 'play_pause') {
-            togglePlay();
-            gestureStatus.textContent = 'HW 제스처: 재생/일시정지 토글';
+            if (HologramStateManager.currentMode === 'GEMINI') {
+                console.log("🤏 [Pinch Gesture] Exiting Gemini AI Mode -> Returning to Music Mode...");
+                HologramStateManager.transitionTo('MUSIC', 'IDLE');
+                gestureStatus.textContent = '🤏 핀치 탭! 제미나이 종료 -> 스피커 모드 복귀';
+            } else {
+                togglePlay();
+                gestureStatus.textContent = 'HW 제스처: 재생/일시정지 토글';
+            }
         } else if (actionType === 'seek') {
             if (audio.duration) {
                 audio.currentTime = velocity * audio.duration;
@@ -2002,11 +2008,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 syncPlayerState();
             }
         } else if (actionType === 'gemini_toggle') {
-            console.log("👍 [Thumbs-Up Gesture] Triggering Gemini AI Mode toggle...");
-            if (HologramStateManager.currentMode === 'GEMINI') {
-                HologramStateManager.transitionTo('MUSIC', 'IDLE');
-                gestureStatus.textContent = '👍 엄지 척! 홀로그램 스피커 모드로 복귀';
-            } else {
+            if (HologramStateManager.currentMode !== 'GEMINI') {
+                console.log("👍 [Thumbs-Up Gesture] Entering Gemini AI Mode...");
                 HologramStateManager.transitionTo('GEMINI', 'LISTENING');
                 gestureStatus.textContent = '👍 엄지 척! 제미나이 AI 모드 시작... 🤖';
                 if (btnGeminiMic) {

@@ -155,6 +155,7 @@ except Exception as e:
 mp_history = []
 mp_last_gesture_time = 0
 mp_last_thumbsup_time = 0
+thumbsup_start_time = 0
 is_pinching = False
 pinch_start_time = 0
 pinch_start_x = 0.5
@@ -167,7 +168,7 @@ motion_history = []
 last_motion_gesture_time = 0
 
 def process_motion_gesture(frame):
-    global mp_hands_detector, mp_drawing, mp_hands_solution, mp_history, mp_last_gesture_time, mp_last_thumbsup_time
+    global mp_hands_detector, mp_drawing, mp_hands_solution, mp_history, mp_last_gesture_time, mp_last_thumbsup_time, thumbsup_start_time
     global is_pinching, pinch_start_time, pinch_start_x, mp_last_seek_time
     global mp_prev_point_x, mp_prev_point_y
     global prev_motion_gray, motion_history, last_motion_gesture_time
@@ -240,15 +241,26 @@ def process_motion_gesture(frame):
                     # --- BOUNDARY GUARD: Suppress swipe when hand is near frame edges ---
                     is_near_edge = (wrist.x < 0.10 or wrist.x > 0.90 or wrist.y < 0.08 or wrist.y > 0.92)
 
-                    # --- 0. 👍 THUMBS-UP GESTURE (Ultra-Responsive Gemini AI Trigger) ---
+                    # --- 0. 👍 THUMBS-UP GESTURE (Requires 0.45s Sustained Hold to Trigger Gemini AI) ---
                     if is_thumbs_up_gesture and not is_near_edge:
-                        if current_time - mp_last_thumbsup_time >= 0.6:
-                            print("[Camera Gesture - MediaPipe AI] 👍 Thumbs-Up Gesture Triggered Immediately!", flush=True)
-                            socketio.emit('gesture_trigger', {'type': 'gemini_toggle'})
-                            mp_last_thumbsup_time = current_time
-                            mp_history = []
+                        if thumbsup_start_time == 0:
+                            thumbsup_start_time = current_time
+                        
+                        thumbsup_duration = current_time - thumbsup_start_time
+
+                        # Requires holding Thumbs-Up stance for >= 0.45 seconds to trigger
+                        if thumbsup_duration >= 0.45:
+                            if current_time - mp_last_thumbsup_time >= 1.0:
+                                print(f"[Camera Gesture - MediaPipe AI] 👍 Thumbs-Up Held for {thumbsup_duration:.2f}s -> Gemini AI Mode Triggered!", flush=True)
+                                socketio.emit('gesture_trigger', {'type': 'gemini_toggle'})
+                                mp_last_thumbsup_time = current_time
+                                thumbsup_start_time = 0
+                                mp_history = []
+                                return
                             return
                         return
+                    else:
+                        thumbsup_start_time = 0
 
                     # --- 1. PINCH & PINCH-DRAG SEEK (Scale-Invariant Hysteresis) ---
                     if (pinch_ratio < 0.28 or (is_pinching and pinch_ratio < 0.38)) and not is_open_palm and not is_near_edge:
