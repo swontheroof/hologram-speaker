@@ -558,7 +558,7 @@ document.addEventListener('DOMContentLoaded', () => {
         geminiVideoTexture.format = THREE.RGBAFormat;
 
         // Project video texture onto PlaneGeometry (representing the 3D rotating visual)
-        const geminiPlaneGeo = new THREE.PlaneGeometry(2.2, 2.2);
+        const geminiPlaneGeo = new THREE.PlaneGeometry(3.2, 3.2);
         const geminiPlaneMat = new THREE.MeshBasicMaterial({
             map: geminiVideoTexture,
             transparent: true,
@@ -578,9 +578,9 @@ document.addEventListener('DOMContentLoaded', () => {
         for (let i = 0; i < geminiPartCount; i++) {
             const angle = (i / geminiPartCount) * Math.PI * 2;
             const deviation = (Math.random() - 0.5) * 0.3;
-            geminiPartPositions[i * 3] = Math.cos(angle) * (1.5 + deviation);
+            geminiPartPositions[i * 3] = Math.cos(angle) * (2.1 + deviation);
             geminiPartPositions[i * 3 + 1] = (Math.random() - 0.5) * 0.4;
-            geminiPartPositions[i * 3 + 2] = Math.sin(angle) * (1.5 + deviation);
+            geminiPartPositions[i * 3 + 2] = Math.sin(angle) * (2.1 + deviation);
         }
         geminiPartGeo.setAttribute('position', new THREE.BufferAttribute(geminiPartPositions, 3));
 
