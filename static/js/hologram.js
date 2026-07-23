@@ -668,8 +668,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
         // A. Apply rotation physics (Inertia & Damping)
-        if (!isDragging && !isGestureDragging) {
-            if (HologramStateManager.currentMode === 'GEMINI') {
+        if (!isDragging) {
+            if (isGestureDragging) {
+                // Smooth 60fps gesture rotation using lerped velocities
+                hologramCube.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), rotVelY);
+                hologramCube.rotateOnWorldAxis(new THREE.Vector3(1, 0, 0), rotVelX);
+                hologramCube.rotateOnWorldAxis(new THREE.Vector3(0, 0, 1), rotVelZ);
+                rotVelX *= friction;
+                rotVelY *= friction;
+                rotVelZ *= friction;
+            } else if (HologramStateManager.currentMode === 'GEMINI') {
                 // In Gemini mode, smoothly interpolate rotation speeds (acceleration/deceleration damping)
                 rotVelX += (targetRotVelX - rotVelX) * 0.08;
                 rotVelY += (targetRotVelY - rotVelY) * 0.08;
@@ -985,10 +993,14 @@ document.addEventListener('DOMContentLoaded', () => {
             // Calculate instantaneous drag velocity
             dragVelocityX = dx / dt;
             dragVelocityY = dy / dt;
-            // Rotate cube instantly during drag on multiple axes (aligned to match physical direction)
-            hologramCube.rotation.y += dx * 0.007;
-            hologramCube.rotation.x += dy * 0.007;
-            hologramCube.rotation.z += (dx + dy) * 0.003;
+
+            // Sensitivity multiplier (Base: 42.0)
+            const sensFactor = (dragSensitivity / 42.0);
+
+            // Rotate cube instantly during drag on multiple axes
+            hologramCube.rotation.y += dx * 0.007 * sensFactor;
+            hologramCube.rotation.x += dy * 0.007 * sensFactor;
+            hologramCube.rotation.z += (dx + dy) * 0.003 * sensFactor;
             lastInteractionTime = Date.now();
         }
 
@@ -1001,12 +1013,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!isDragging) return;
         isDragging = false;
 
-        // Map drag velocity to target rotation velocity (aligned to match physical direction)
-        rotVelY = dragVelocityX * 0.8;
-        rotVelX = dragVelocityY * 0.8;
-        rotVelZ = (dragVelocityX + dragVelocityY) * 0.3;
+        const sensFactor = (dragSensitivity / 42.0);
 
-        const maxVel = 0.2;
+        // Map drag velocity to target rotation velocity with sensitivity scaling
+        rotVelY = dragVelocityX * 0.8 * sensFactor;
+        rotVelX = dragVelocityY * 0.8 * sensFactor;
+        rotVelZ = (dragVelocityX + dragVelocityY) * 0.3 * sensFactor;
+
+        // Expanded max velocity limit from 0.2 to 0.8 (4x max speed)
+        const maxVel = 0.8 * sensFactor;
         rotVelY = Math.max(-maxVel, Math.min(maxVel, rotVelY));
         rotVelX = Math.max(-maxVel, Math.min(maxVel, rotVelX));
         rotVelZ = Math.max(-maxVel, Math.min(maxVel, rotVelZ));
@@ -1926,16 +1941,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 isGestureDragging = false;
                 isTouchActive = false;
                 isGrabActive = false;
-            }, 180); // slightly longer buffer for wireless latency
+            }, 220); // Smooth buffer for wireless & frame gaps
 
-            const sensitivity = dragSensitivity * 0.12;
-            hologramCube.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), dx * sensitivity);
-            hologramCube.rotateOnWorldAxis(new THREE.Vector3(1, 0, 0), dy * sensitivity);
+            // Smooth Interpolated Rotation Physics (Removes discrete stuttering/jerking)
+            const sensFactor = (dragSensitivity / 42.0);
+            const targetVx = dx * 0.25 * sensFactor;
+            const targetVy = dy * 0.25 * sensFactor;
 
-            const maxInertia = 0.05;
-            rotVelY = Math.max(-maxInertia, Math.min(maxInertia, dx * sensitivity * 0.30));
-            rotVelX = Math.max(-maxInertia, Math.min(maxInertia, dy * sensitivity * 0.30));
-            rotVelZ = Math.max(-maxInertia * 0.3, Math.min(maxInertia * 0.3, (dx + dy) * sensitivity * 0.10));
+            // Exponential velocity smoothing (Lerp) for silky 60fps movement
+            rotVelY += (targetVx - rotVelY) * 0.40;
+            rotVelX += (targetVy - rotVelX) * 0.40;
+            rotVelZ += ((targetVx + targetVy) * 0.15 - rotVelZ) * 0.25;
 
             lastInteractionTime = Date.now();
             if (isGrabActive) {

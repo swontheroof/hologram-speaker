@@ -419,8 +419,8 @@
             </div>
 
             <div class="setting-row">
-                <label for="slider-sensitivity">회전 감도 (Sensitivity)</label>
-                <input type="range" id="slider-sensitivity" min="10" max="150" step="1" value="42">
+                <label for="slider-sensitivity">회전 감도 (<span id="lbl-sensitivity" style="color:var(--accent-blue); font-family:'JetBrains Mono'; font-weight:600;">42</span>)</label>
+                <input type="range" id="slider-sensitivity" min="10" max="500" step="5" value="100">
             </div>
 
             <div class="setting-row">
@@ -663,8 +663,11 @@
             if (e.key === 'Enter') sendChat();
         });
 
-        // 4. Remote Setting modifications
+        const lblSensitivity = document.getElementById('lbl-sensitivity');
         function emitSettings() {
+            if (lblSensitivity && sliderSensitivity) {
+                lblSensitivity.textContent = sliderSensitivity.value;
+            }
             socket.emit('remote_setting_change', {
                 friction: parseFloat(sliderFriction.value),
                 sensitivity: parseFloat(sliderSensitivity.value),
@@ -673,8 +676,8 @@
             });
         }
 
-        sliderFriction.addEventListener('change', emitSettings);
-        sliderSensitivity.addEventListener('change', emitSettings);
+        sliderFriction.addEventListener('input', emitSettings);
+        sliderSensitivity.addEventListener('input', emitSettings);
         toggleGuides.addEventListener('change', emitSettings);
         toggleWebcam.addEventListener('change', emitSettings);
 
