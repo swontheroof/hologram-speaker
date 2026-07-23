@@ -166,14 +166,30 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 if (state === 'LISTENING') {
                     this.startListeningTimeout();
-                    if (geminiRecognition) {
-                        try {
-                            geminiRecognition.abort();
-                            geminiRecognition.start();
-                        } catch (e) {
-                            console.error("SpeechRecognition start error:", e);
+                    const startMicSafely = () => {
+                        if (geminiRecognition) {
+                            try {
+                                geminiRecognition.abort();
+                            } catch (e) { }
+                            try {
+                                geminiRecognition.start();
+                                console.log("[Gemini Mic] Speech recognition started via gesture!");
+                            } catch (e) {
+                                console.warn("[Gemini Mic] SpeechRecognition start retry notice:", e);
+                            }
                         }
+                    };
+
+                    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                        navigator.mediaDevices.getUserMedia({ audio: true }).then(() => {
+                            startMicSafely();
+                        }).catch(() => {
+                            startMicSafely();
+                        });
+                    } else {
+                        startMicSafely();
                     }
+
                     if (geminiVideo) {
                         geminiVideo.currentTime = 0;
                         geminiVideo.play().catch(e => console.warn("Video play failed:", e));
