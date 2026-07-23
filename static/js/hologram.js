@@ -800,15 +800,22 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Smoothly interpolate current scale to target scale while strictly preserving Z-axis thickness ratio
-        const scaleSpeed = isPlaying ? 0.08 : 0.04; // swell up faster, shrink down slightly slower
-        const thickRatio = (window.targetCubeThickness !== undefined) ? window.targetCubeThickness : 1.0;
+        const scaleSpeed = isPlaying ? 0.08 : 0.04;
+        const validScale = (targetCubeScale && !isNaN(targetCubeScale)) ? targetCubeScale : 1.0;
+        const validTargetScale = (targetScale && !isNaN(targetScale)) ? targetScale : 1.0;
+        const thickRatio = (window.targetCubeThickness && !isNaN(window.targetCubeThickness)) ? window.targetCubeThickness : 1.0;
         
-        const baseTarget = targetScale * targetCubeScale;
+        const baseTarget = validTargetScale * validScale;
         const currentScaleX = hologramCube.scale.x + (baseTarget - hologramCube.scale.x) * scaleSpeed;
         const currentScaleY = hologramCube.scale.y + (baseTarget - hologramCube.scale.y) * scaleSpeed;
         const currentScaleZ = hologramCube.scale.z + (baseTarget * thickRatio - hologramCube.scale.z) * scaleSpeed;
 
-        hologramCube.scale.set(currentScaleX, currentScaleY, currentScaleZ);
+        // Safety Guard: Ensure scale values are strictly valid positive numbers
+        hologramCube.scale.set(
+            Math.max(0.1, isNaN(currentScaleX) ? 1.0 : currentScaleX),
+            Math.max(0.1, isNaN(currentScaleY) ? 1.0 : currentScaleY),
+            Math.max(0.02, isNaN(currentScaleZ) ? 0.1 : currentScaleZ)
+        );
 
         hologramCube.position.x = 0;
         hologramCube.position.z = 0;
@@ -848,11 +855,10 @@ document.addEventListener('DOMContentLoaded', () => {
             geminiMesh.scale.set(curMeshScale, curMeshScale, curMeshScale);
         }
 
-        // Optimize visibility to disable GPU draw calls for transparent meshes
-        const cubeMatOpacity = Array.isArray(hologramCube.material) ? hologramCube.material[0].opacity : hologramCube.material.opacity;
-        hologramCube.visible = (targetCubeOpacity > 0.01 || cubeMatOpacity > 0.01);
+        // Ensure hologramCube is always visible in Music/Standby modes
+        hologramCube.visible = true;
         if (visualizerRing) {
-            visualizerRing.visible = hologramCube.visible;
+            visualizerRing.visible = true;
         }
         if (geminiGroup && geminiMesh && geminiMesh.material) {
             geminiGroup.visible = (targetGeminiOpacity > 0.01 || geminiMesh.material.opacity > 0.01);
@@ -2031,8 +2037,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (data.spinSpeed !== undefined) {
                 targetRotVelY = parseFloat(data.spinSpeed);
-                rotVelY = targetRotVelY;
-            }
                 rotVelY = targetRotVelY;
             }
             if (data.friction !== undefined) {
