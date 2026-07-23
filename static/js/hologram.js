@@ -2254,7 +2254,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 voiceRecognizer = new SpeechRecognition();
                 voiceRecognizer.continuous = true;
                 voiceRecognizer.interimResults = true;
-                voiceRecognizer.lang = 'en-US';
+                voiceRecognizer.lang = navigator.language || 'en-US';
 
                 voiceRecognizer.onstart = () => {
                     isVoiceTriggerListening = true;
@@ -2263,11 +2263,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 voiceRecognizer.onresult = (event) => {
                     for (let i = event.resultIndex; i < event.results.length; ++i) {
-                        const text = event.results[i][0].transcript.toLowerCase().trim();
-                        console.log("[Voice Trigger Hearing]", text);
+                        const rawText = event.results[i][0].transcript.toLowerCase();
+                        const cleanText = rawText.replace(/\s+/g, '');
+                        console.log("🎙️ [Voice Listener Heard]:", rawText);
 
-                        if (text.includes('hey gemini') || text.includes('gemini') || text.includes('헤이 제미나이') || text.includes('제미나이') || text.includes('hi gemini')) {
-                            console.log("🔥 [Voice Trigger Activated!] 'Hey Gemini' detected!");
+                        if (HologramStateManager.currentMode !== 'GEMINI') {
+                            gestureStatus.textContent = `🎙️ 마이크 감지 중: "${rawText.slice(-20)}"`;
+                        }
+
+                        // Ultra-flexible wake word matching
+                        const isHit = cleanText.includes('gemini') || 
+                                      cleanText.includes('제미나이') || 
+                                      cleanText.includes('heygemini') || 
+                                      cleanText.includes('헤이제미나이') || 
+                                      cleanText.includes('해이제미나이') || 
+                                      cleanText.includes('higemini') || 
+                                      cleanText.includes('안녕제미나이');
+
+                        if (isHit) {
+                            console.log("🔥 [Voice Trigger Activated!] 'Hey Gemini' detected via:", rawText);
                             
                             // Prevent multi-triggering if already in GEMINI mode
                             if (HologramStateManager.currentMode === 'GEMINI') return;
