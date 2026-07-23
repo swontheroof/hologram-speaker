@@ -2012,9 +2012,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log("👍 [Thumbs-Up Gesture] Entering Gemini AI Mode...");
                 HologramStateManager.transitionTo('GEMINI', 'LISTENING');
                 gestureStatus.textContent = '👍 엄지 척! 제미나이 AI 모드 시작... 🤖';
-                if (btnGeminiMic) {
-                    btnGeminiMic.click();
-                }
             }
         }
     });
