@@ -712,6 +712,49 @@ def debug_mic():
     results['gemini_api_key_present'] = bool(os.environ.get("GEMINI_API_KEY"))
     return jsonify(results)
 
+@app.route('/api/tts')
+def tts_proxy():
+    text = request.args.get('text', '')
+    if not text:
+        return "No text provided", 400
+
+    import re
+    import urllib.parse
+    text = re.sub(r'\[ACTION:[^\]]+\]', '', text).strip()
+    if not text:
+        return "Empty text", 400
+
+    raw_sentences = re.split(r'([.?!,\n])', text)
+    chunks = []
+    current = ""
+    for s in raw_sentences:
+        if len(current) + len(s) < 150:
+            current += s
+        else:
+            if current.strip():
+                chunks.append(current.strip())
+            current = s
+    if current.strip():
+        chunks.append(current.strip())
+
+    if not chunks:
+        chunks = [text[:150]]
+
+    audio_bytes = bytearray()
+    for chunk in chunks[:4]:
+        tts_url = f"https://translate.google.com/translate_tts?ie=UTF-8&q={urllib.parse.quote(chunk)}&tl=ko&client=tw-ob"
+        try:
+            req = urllib.request.Request(tts_url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
+            with urllib.request.urlopen(req, timeout=5) as response:
+                audio_bytes.extend(response.read())
+        except Exception as e:
+            print(f"[TTS Proxy Error] {e}", flush=True)
+
+    if not audio_bytes:
+        return jsonify({"error": "Failed to generate TTS"}), 500
+
+    return Response(bytes(audio_bytes), mimetype="audio/mpeg")
+
 @socketio.on('gemini_button')
 def handle_gemini_button():
     import threading

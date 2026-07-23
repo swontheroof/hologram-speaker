@@ -187,9 +187,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         try { geminiRecognition.abort(); } catch (e) { }
                     }
                 } else if (state === 'SPEAKING') {
-                    if (window.speechSynthesis) {
-                        window.speechSynthesis.cancel();
-                    }
+                    stopTTS();
                 }
             }
         },
@@ -1726,50 +1724,106 @@ document.addEventListener('DOMContentLoaded', () => {
             });
     }
 
+    let ttsAudio = null;
+    let ttsPulseInterval = null;
+
+    function stopTTS() {
+        if (ttsPulseInterval) {
+            clearInterval(ttsPulseInterval);
+            ttsPulseInterval = null;
+        }
+        geminiScalePulse = 1.0;
+        if (ttsAudio) {
+            try { ttsAudio.pause(); } catch (e) {}
+            ttsAudio = null;
+        }
+        if (window.speechSynthesis) {
+            try { window.speechSynthesis.cancel(); } catch (e) {}
+        }
+    }
+
     function speakGemini(text) {
-        if (!window.speechSynthesis) {
-            console.warn("SpeechSynthesis not supported");
+        if (!text) {
             if (HologramStateManager.currentMode === 'GEMINI') {
                 HologramStateManager.transitionTo('GEMINI', 'LISTENING');
             }
             return;
         }
 
-        // Cancel any active speech first
-        window.speechSynthesis.cancel();
+        const cleanText = text.replace(/\[ACTION:[^\]]+\]/g, '').trim();
+        if (!cleanText) {
+            if (HologramStateManager.currentMode === 'GEMINI') {
+                HologramStateManager.transitionTo('GEMINI', 'LISTENING');
+            }
+            return;
+        }
 
+        stopTTS();
+
+        // Use backend TTS MP3 endpoint (Reliable audio playback on Raspberry Pi / Linux Chrome)
+        const ttsUrl = `/api/tts?text=${encodeURIComponent(cleanText)}`;
+        ttsAudio = new Audio(ttsUrl);
+
+        ttsAudio.onplay = () => {
+            console.log("[Gemini TTS] Audio playback started via backend proxy");
+            ttsPulseInterval = setInterval(() => {
+                geminiScalePulse = (geminiScalePulse === 1.6) ? 1.0 : 1.6;
+            }, 250);
+        };
+
+        ttsAudio.onended = () => {
+            console.log("[Gemini TTS] Audio playback finished");
+            stopTTS();
+            if (HologramStateManager.currentMode === 'GEMINI') {
+                HologramStateManager.transitionTo('GEMINI', 'LISTENING');
+            }
+        };
+
+        ttsAudio.onerror = (e) => {
+            console.warn("[Gemini TTS] Proxy audio failed, falling back to Web Speech API", e);
+            stopTTS();
+            speakGeminiWebSpeech(cleanText);
+        };
+
+        ttsAudio.play().catch(err => {
+            console.warn("[Gemini TTS] Audio play error, falling back to Web Speech API", err);
+            stopTTS();
+            speakGeminiWebSpeech(cleanText);
+        });
+    }
+
+    function speakGeminiWebSpeech(text) {
+        if (!window.speechSynthesis) {
+            if (HologramStateManager.currentMode === 'GEMINI') {
+                HologramStateManager.transitionTo('GEMINI', 'LISTENING');
+            }
+            return;
+        }
+
+        window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(text);
-        currentUtterance = utterance; // Prevent garbage collection of utterance object causing onend to fail
+        currentUtterance = utterance;
         utterance.lang = 'ko-KR';
 
-        // Select a premium sounding Korean voice if available
         const voices = window.speechSynthesis.getVoices();
         const koVoice = voices.find(voice => voice.lang.includes('ko'));
         if (koVoice) {
             utterance.voice = koVoice;
         }
 
-        utterance.onstart = () => {
-            // Already handled by transitionTo before calling speakGemini
-        };
-
-        // Pulsate/bounce the 3D model during speech synthesis boundary events (words spoken)!
-        utterance.onboundary = (event) => {
-            geminiScalePulse = 1.6; // trigger a bounce
+        utterance.onboundary = () => {
+            geminiScalePulse = 1.6;
         };
 
         utterance.onend = () => {
-            console.log("[Gemini Speech] Speaking ended");
             geminiScalePulse = 1.0;
-
-            // Loop back to speech recognition
             if (HologramStateManager.currentMode === 'GEMINI') {
                 HologramStateManager.transitionTo('GEMINI', 'LISTENING');
             }
         };
 
         utterance.onerror = (e) => {
-            console.error("[Gemini Speech] speaking error:", e);
+            console.error("[Gemini WebSpeech] Error:", e);
             geminiScalePulse = 1.0;
             if (HologramStateManager.currentMode === 'GEMINI') {
                 HologramStateManager.transitionTo('GEMINI', 'LISTENING');
