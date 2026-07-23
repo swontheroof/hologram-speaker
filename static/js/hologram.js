@@ -747,50 +747,44 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // B. Handle Audio Frequency Analysis and Spatial touch feedback
-        let targetScale = 1.0;
-        if (isPlaying) {
-            if (analyser) {
-                analyser.getByteFrequencyData(dataArray);
-                let sum = 0;
-                for (let i = 0; i < 8; i++) {
-                    sum += dataArray[i];
+        let audioPulse = 1.0;
+        if (isPlaying && analyser) {
+            analyser.getByteFrequencyData(dataArray);
+            let sum = 0;
+            for (let i = 0; i < 8; i++) {
+                sum += dataArray[i];
+            }
+            const avg = sum / 8; // 0 to 255
+            audioPulse = 1.0 + (avg / 255.0) * 0.15; // Subtle music beat pulse
+
+            if (visualizerRing) {
+                // Combine audio pulse with spatial touch scaling
+                let spatialScale = 1.0;
+                let targetColor = new THREE.Color(0x00acff);
+
+                if (isTouchActive) {
+                    spatialScale = 1.25;
+                    targetColor.setHex(0xd000ff); // Magenta
+                } else {
+                    spatialScale = 1.0;
+                    targetColor.setHex(0x00acff); // Cyan
                 }
-                const avg = sum / 8; // 0 to 255
-                targetScale = 1.0 + (avg / 255.0) * 0.4;
+                hologramCube.position.x = 0;
+                hologramCube.position.z = 0;
 
-                if (visualizerRing) {
-                    // Combine audio pulse with spatial touch scaling
-                    let spatialScale = 1.0;
-                    let targetColor = new THREE.Color(0x00acff);
+                // Smoothly interpolate color
+                visualizerRing.material.color.lerp(targetColor, 0.1);
 
-                    if (isTouchActive) {
-                        spatialScale = 1.25;
-                        targetColor.setHex(0xd000ff); // Magenta
-                    } else {
-                        spatialScale = 1.0;
-                        targetColor.setHex(0x00acff); // Cyan
-                    }
-                    hologramCube.position.x = 0;
-                    hologramCube.position.z = 0;
+                // Set particle size with audio pulse
+                visualizerRing.material.size = (0.08 + (avg / 255.0) * 0.08) * (isTouchActive ? 1.3 : 1.0);
 
-                    // Smoothly interpolate color
-                    visualizerRing.material.color.lerp(targetColor, 0.1);
-
-                    // Set particle size with audio pulse
-                    visualizerRing.material.size = (0.08 + (avg / 255.0) * 0.08) * (isTouchActive ? 1.3 : 1.0);
-
-                    // Smoothly scale the ring
-                    const ringTargetScale = spatialScale * (1.0 + (avg / 255.0) * 0.15);
-                    const currentRingScale = visualizerRing.scale.x + (ringTargetScale - visualizerRing.scale.x) * 0.1;
-                    visualizerRing.scale.set(currentRingScale, currentRingScale, currentRingScale);
-                }
-            } else {
-                targetScale = 1.0;
+                // Smoothly scale the ring
+                const ringTargetScale = spatialScale * (1.0 + (avg / 255.0) * 0.15);
+                const currentRingScale = visualizerRing.scale.x + (ringTargetScale - visualizerRing.scale.x) * 0.1;
+                visualizerRing.scale.set(currentRingScale, currentRingScale, currentRingScale);
             }
         } else {
-            targetScale = 0.75;
             if (visualizerRing) {
-                // Return to default resting scale/color when paused
                 const restColor = new THREE.Color(0x00acff);
                 visualizerRing.material.color.lerp(restColor, 0.1);
                 const restScale = visualizerRing.scale.x + (0.8 - visualizerRing.scale.x) * 0.1;
@@ -799,22 +793,25 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // Smoothly interpolate current scale to target scale while strictly preserving Z-axis thickness ratio
+        // Smoothly interpolate current scale while STRICTLY preserving user scale & Z-thickness without reset or shrink
         const scaleSpeed = isPlaying ? 0.08 : 0.04;
-        const validScale = (targetCubeScale && !isNaN(targetCubeScale)) ? targetCubeScale : 1.0;
-        const validTargetScale = (targetScale && !isNaN(targetScale)) ? targetScale : 1.0;
-        const thickRatio = (window.targetCubeThickness && !isNaN(window.targetCubeThickness)) ? window.targetCubeThickness : 1.0;
-        
-        const baseTarget = validTargetScale * validScale;
-        const currentScaleX = hologramCube.scale.x + (baseTarget - hologramCube.scale.x) * scaleSpeed;
-        const currentScaleY = hologramCube.scale.y + (baseTarget - hologramCube.scale.y) * scaleSpeed;
-        const currentScaleZ = hologramCube.scale.z + (baseTarget * thickRatio - hologramCube.scale.z) * scaleSpeed;
+        const validScale = (targetCubeScale !== undefined && !isNaN(targetCubeScale)) ? targetCubeScale : 0.8;
+        const thickRatio = (window.targetCubeThickness !== undefined && !isNaN(window.targetCubeThickness)) ? window.targetCubeThickness : 1.0;
 
-        // Safety Guard: Ensure scale values are strictly valid positive numbers
+        // User scale is the ABSOLUTE base. Audio beat only adds subtle 15% pulse overlay without altering base scale.
+        const targetX = validScale * audioPulse;
+        const targetY = validScale * audioPulse;
+        const targetZ = validScale * thickRatio * audioPulse;
+
+        const currentScaleX = hologramCube.scale.x + (targetX - hologramCube.scale.x) * scaleSpeed;
+        const currentScaleY = hologramCube.scale.y + (targetY - hologramCube.scale.y) * scaleSpeed;
+        const currentScaleZ = hologramCube.scale.z + (targetZ - hologramCube.scale.z) * scaleSpeed;
+
+        // Safety Guard: Ensure scale values are strictly valid positive numbers based on user scale
         hologramCube.scale.set(
-            Math.max(0.1, isNaN(currentScaleX) ? 1.0 : currentScaleX),
-            Math.max(0.1, isNaN(currentScaleY) ? 1.0 : currentScaleY),
-            Math.max(0.02, isNaN(currentScaleZ) ? 0.1 : currentScaleZ)
+            Math.max(0.1, isNaN(currentScaleX) ? validScale : currentScaleX),
+            Math.max(0.1, isNaN(currentScaleY) ? validScale : currentScaleY),
+            Math.max(0.02, isNaN(currentScaleZ) ? validScale * thickRatio : currentScaleZ)
         );
 
         hologramCube.position.x = 0;
