@@ -58,6 +58,20 @@ SONGS = [
         "artist": "Deli Spice",
         "src": "/static/assets/chau_chau.mp3",
         "cover": "/static/assets/chau_chau_art.jpg"
+    },
+    {
+        "id": 6,
+        "title": "Kiss Me More",
+        "artist": "Doja Cat",
+        "src": "/static/assets/kissmemore.mp3",
+        "cover": "/static/assets/kissmemore_art.jpg"
+    },
+    {
+        "id": 7,
+        "title": "사랑했나봐",
+        "artist": "윤도현",
+        "src": "/static/assets/musthaveloved.mp3",
+        "cover": "/static/assets/musthaveloved_art.webp"
     }
 ]
 
@@ -549,11 +563,101 @@ def handle_hardware_gesture(data):
     # Forward the gesture straight to the browser
     emit('gesture_trigger', data, broadcast=True)
 
+# --- USB Microphone Gemini Audio Capture Routine ---
+def find_usb_mic_device():
+    try:
+        res = subprocess.run(["arecord", "-l"], capture_output=True, text=True)
+        out = res.stdout
+        for line in out.splitlines():
+            if "card" in line and ("USB" in line or "Codec" in line or "PnP" in line):
+                card_num = line.split("card")[1].split(":")[0].strip()
+                print(f"[USB Mic Auto-Detect] Found USB Audio Card {card_num}", flush=True)
+                return f"hw:{card_num},0"
+    except Exception as e:
+        print(f"[USB Mic Find Error] {e}", flush=True)
+    return "hw:2,0"
+
+def record_and_process_audio():
+    import base64
+    mic_dev = find_usb_mic_device()
+    print(f"[Gemini Mic] Recording 3.5s audio from USB Mic ({mic_dev})...", flush=True)
+    wav_path = "/tmp/gemini_input.wav"
+    try:
+        subprocess.run(["arecord", "-D", mic_dev, "-f", "S16_LE", "-r", "16000", "-c", "1", "-d", "3", wav_path], check=True, stderr=subprocess.DEVNULL)
+        print(f"[Gemini Mic] Audio recording finished! Processing with Gemini...", flush=True)
+        socketio.emit('gemini_mic_state', {'state': 'THINKING'})
+        
+        with open(wav_path, "rb") as f:
+            audio_bytes = f.read()
+        audio_b64 = base64.b64encode(audio_bytes).decode('utf-8')
+
+        api_key = os.environ.get("GEMINI_API_KEY")
+        if not api_key:
+            answer = "USB 마이크 음성을 정상 수신했습니다! 환경 변수에 GEMINI_API_KEY를 추가하시면 실시간 대화와 음성 곡 제어가 작동합니다."
+        else:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+            headers = {"Content-Type": "application/json"}
+            body = {
+                "systemInstruction": {
+                    "parts": [{
+                        "text": "너는 라즈베리파이 홀로그램 스마트 스피커 AI 비서야. 사용자가 한국어 음성으로 요구한 내용을 분석해 친절히 답변해줘. 만약 음악 재생, 일시정지, 다음 곡, 이전 곡 등의 요구가 있다면 답변 머리에 알맞은 태그([ACTION:PLAY], [ACTION:PAUSE], [ACTION:NEXT], [ACTION:PREV])를 반드시 달아줘."
+                    }]
+                },
+                "contents": [{
+                    "parts": [
+                        {
+                            "inlineData": {
+                                "mimeType": "audio/wav",
+                                "data": audio_b64
+                            }
+                        },
+                        {
+                            "text": "사용자의 마이크 음성 명령어입니다. 음성을 인식하고 적절한 답변과 제어 태그를 반환하세요."
+                        }
+                    ]
+                }],
+                "generationConfig": {
+                    "maxOutputTokens": 512,
+                    "thinkingConfig": { "thinkingBudget": 0 }
+                }
+            }
+            req = urllib.request.Request(url, data=json.dumps(body).encode('utf-8'), headers=headers, method='POST')
+            with urllib.request.urlopen(req, timeout=12) as response:
+                res_data = json.loads(response.read().decode('utf-8'))
+                answer = res_data['candidates'][0]['content']['parts'][0]['text']
+
+        # Parse control tags from the final answer
+        action_type = None
+        if answer:
+            if "[ACTION:PLAY]" in answer:
+                action_type = "play"
+                answer = answer.replace("[ACTION:PLAY]", "").strip()
+            elif "[ACTION:PAUSE]" in answer:
+                action_type = "pause"
+                answer = answer.replace("[ACTION:PAUSE]", "").strip()
+            elif "[ACTION:NEXT]" in answer:
+                action_type = "next"
+                answer = answer.replace("[ACTION:NEXT]", "").strip()
+            elif "[ACTION:PREV]" in answer:
+                action_type = "prev"
+                answer = answer.replace("[ACTION:PREV]", "").strip()
+
+        if action_type:
+            print(f"[Gemini Action] Detected action: {action_type}. Emitting socket event.", flush=True)
+            socketio.emit('gesture_trigger', {'type': action_type})
+
+        print(f"[Gemini Mic Answer] {answer}", flush=True)
+        socketio.emit('gemini_mic_response', {'response': answer})
+    except Exception as e:
+        print(f"[Gemini Mic Error] {e}", flush=True)
+        socketio.emit('gemini_mic_response', {'response': f"마이크 처리 중 오류가 발생했습니다: {e}"})
+
 @socketio.on('gemini_button')
 def handle_gemini_button():
-    print("[WebSocket] Received hardware gemini button event")
-    # Broadcast to the browser frontend to toggle Gemini Mode
+    import threading
+    print("[WebSocket] Received hardware gemini button event. Starting USB Mic capture...", flush=True)
     emit('gemini_toggle', {}, broadcast=True)
+    threading.Thread(target=record_and_process_audio, daemon=True).start()
 
 # Remote control sync events
 @socketio.on('remote_setting_change')

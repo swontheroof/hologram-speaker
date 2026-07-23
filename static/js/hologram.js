@@ -1949,6 +1949,22 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Remote Gemini USB Mic Synchronization
+    socket.on('gemini_mic_state', (data) => {
+        if (data.state === 'THINKING') {
+            gestureStatus.textContent = '제미나이: 생각 중... ☄️';
+            HologramStateManager.transitionTo('GEMINI', 'THINKING');
+        }
+    });
+
+    socket.on('gemini_mic_response', (data) => {
+        const answer = data.response;
+        console.log("[Gemini USB Mic Response]", answer);
+        gestureStatus.textContent = `제미나이: "${answer}"`;
+        HologramStateManager.transitionTo('GEMINI', 'SPEAKING');
+        speakGemini(answer);
+    });
+
     // Remote Gemini Chat synchronization
     socket.on('remote_chat_trigger', (data) => {
         console.log("Remote Chat Trigger received:", data.prompt);
