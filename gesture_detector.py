@@ -254,7 +254,13 @@ def run_physical_camera_detector():
                     # 1. Calculate hand scale (Z-depth approximation)
                     index_knuckle = hand_landmarks.landmark[5]
                     hand_scale = ((wrist.x - index_knuckle.x)**2 + (wrist.y - index_knuckle.y)**2)**0.5
-                    is_touch_active = hand_scale >= 0.14
+                    is_touch_active = hand_scale >= 0.18
+
+                    # Proximity Guard: Ignore hands that are far away (< 0.18 hand scale)
+                    if hand_scale < 0.18:
+                        prev_x = None
+                        prev_y = None
+                        continue
 
                     # Track pose state changes to prevent coordinate jumps
                     current_pose = 'pointing' if is_pointing else ('v' if is_v_sign else ('palm' if is_flat_palm else None))

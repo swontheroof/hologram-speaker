@@ -162,8 +162,8 @@ def process_motion_gesture(frame):
                     # 1. Calculate Hand Physical Size (Wrist to Middle MCP)
                     hand_size = np.hypot(wrist.x - middle_mcp.x, wrist.y - middle_mcp.y)
 
-                    # --- PROXIMITY GUARD: Ignore hands that are very far away (< 0.08 of frame) ---
-                    if hand_size < 0.08:
+                    # --- PROXIMITY GUARD: Ignore hands that are far away (< 0.18 of frame) ---
+                    if hand_size < 0.18:
                         is_pinching = False
                         mp_prev_point_x = None
                         mp_prev_point_y = None
