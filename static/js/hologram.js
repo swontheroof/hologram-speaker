@@ -892,15 +892,24 @@ document.addEventListener('DOMContentLoaded', () => {
         renderer.setScissorTest(true);
 
         if (window.hologramViewMode === 'SINGLE_EAST') {
-            // Single 1-Face Mode (East View shifted to right side with custom size)
-            const scale = window.singleModeScale || 0.48; // default 48% size
-            const offsetXRatio = (window.singleModeOffsetX !== undefined) ? window.singleModeOffsetX : 0.30; // shifted to East side
+            // Single 1-Face Mode (East View with customizable scale, position X/Y, and camera zoom)
+            const scale = window.singleModeScale || 0.48;
+            const offsetXRatio = (window.singleModeOffsetX !== undefined) ? window.singleModeOffsetX : 0.30;
+            const offsetYRatio = (window.singleModeOffsetY !== undefined) ? window.singleModeOffsetY : 0.0;
+            const zoom = window.singleModeZoom || 1.0;
+
+            // Dynamically set camera distance so 3D objects are never truncated by camera frustum
+            const baseDist = 5.0;
+            if (cameraEast) {
+                cameraEast.position.set(baseDist * zoom, 0, 0);
+            }
+
             const singleSize = Math.min(w, h) * scale;
             const vx = cx + (Math.min(w, h) * offsetXRatio) - (singleSize / 2);
-            const vy = cy - (singleSize / 2);
+            const vy = cy + (Math.min(w, h) * offsetYRatio) - (singleSize / 2);
 
             renderer.setViewport(vx, vy, singleSize, singleSize);
-            renderer.setScissor(vx, vy, singleSize, singleSize);
+            renderer.setScissor(0, 0, w, h); // Scissor full screen so 3D meshes/visualizer rings never clip!
             renderer.render(scene, cameraEast);
         } else {
             // Quad 4-Face Pyramid Mode (Default)
@@ -1925,6 +1934,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (data.singleOffsetX !== undefined) {
             window.singleModeOffsetX = parseFloat(data.singleOffsetX);
+        }
+        if (data.singleOffsetY !== undefined) {
+            window.singleModeOffsetY = parseFloat(data.singleOffsetY);
+        }
+        if (data.singleZoom !== undefined) {
+            window.singleModeZoom = parseFloat(data.singleZoom);
         }
         if (data.friction !== undefined) {
             frictionSlider.value = data.friction;

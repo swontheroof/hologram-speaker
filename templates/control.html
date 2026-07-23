@@ -415,6 +415,14 @@
                     <label for="slider-single-offset-x">↔️ 1면 좌우 위치 (East Side)</label>
                     <input type="range" id="slider-single-offset-x" min="-0.60" max="0.60" step="0.01" value="0.30">
                 </div>
+                <div class="setting-row" style="margin-top: 8px;">
+                    <label for="slider-single-offset-y">↕️ 1면 상하 위치 (Y-Offset)</label>
+                    <input type="range" id="slider-single-offset-y" min="-0.50" max="0.50" step="0.01" value="0.00">
+                </div>
+                <div class="setting-row" style="margin-top: 8px;">
+                    <label for="slider-single-zoom">🔎 3D 카메라 거리 / Zoom (잘림 방지)</label>
+                    <input type="range" id="slider-single-zoom" min="0.50" max="2.00" step="0.02" value="1.00">
+                </div>
             </div>
         </section>
 
@@ -529,7 +537,7 @@
             if (state.currentTime !== undefined && (state.currentTime > 0 || !state.isPlaying)) {
                 remoteCurrentTime = state.currentTime;
             }
-            if (state.hologramViewMode) {
+            if (state.hologramViewMode && !isUserDraggingSlider) {
                 updateViewModeUI(state.hologramViewMode);
             }
             isRemotePlaying = !!state.isPlaying;
@@ -642,10 +650,13 @@
 
         // 5. Hologram View Mode Toggle (QUAD vs SINGLE_EAST)
         let currentHologramViewMode = 'QUAD';
+        let isUserDraggingSlider = false;
         const btnToggleViewMode = document.getElementById('btn-toggle-view-mode');
         const singleModeControls = document.getElementById('single-mode-controls');
         const sliderSingleScale = document.getElementById('slider-single-scale');
         const sliderSingleOffsetX = document.getElementById('slider-single-offset-x');
+        const sliderSingleOffsetY = document.getElementById('slider-single-offset-y');
+        const sliderSingleZoom = document.getElementById('slider-single-zoom');
 
         function updateViewModeUI(mode) {
             currentHologramViewMode = mode;
@@ -668,13 +679,27 @@
 
         function emitSingleModeParams() {
             socket.emit('remote_setting_change', {
+                viewMode: 'SINGLE_EAST',
                 singleScale: parseFloat(sliderSingleScale.value),
-                singleOffsetX: parseFloat(sliderSingleOffsetX.value)
+                singleOffsetX: parseFloat(sliderSingleOffsetX.value),
+                singleOffsetY: parseFloat(sliderSingleOffsetY.value),
+                singleZoom: parseFloat(sliderSingleZoom.value)
             });
         }
 
-        sliderSingleScale.addEventListener('input', emitSingleModeParams);
-        sliderSingleOffsetX.addEventListener('input', emitSingleModeParams);
+        [sliderSingleScale, sliderSingleOffsetX, sliderSingleOffsetY, sliderSingleZoom].forEach(slider => {
+            slider.addEventListener('mousedown', () => { isUserDraggingSlider = true; });
+            slider.addEventListener('touchstart', () => { isUserDraggingSlider = true; });
+            slider.addEventListener('input', emitSingleModeParams);
+            slider.addEventListener('change', () => {
+                isUserDraggingSlider = false;
+                emitSingleModeParams();
+            });
+            slider.addEventListener('touchend', () => {
+                isUserDraggingSlider = false;
+                emitSingleModeParams();
+            });
+        });
 
         // 6. Live Camera Stream preview toggle
         const btnToggleCamStream = document.getElementById('btn-toggle-camera-stream');
