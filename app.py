@@ -153,39 +153,39 @@ def process_motion_gesture(frame):
                     is_open_palm = is_index_extended and is_middle_extended and is_ring_extended
                     is_index_only = is_index_extended and (not is_middle_extended) and (not is_ring_extended)
 
-                    # --- 1. OPEN HAND SWIPE DETECTION (Next/Prev Song) ---
-                    if is_open_palm and dist_pinch > 0.07:
-                        is_pinching = False
+                    # --- 1. PINCH & PINCH-DRAG SEEK (Hysteresis: Enter 0.075, Hold until 0.090) ---
+                    if (dist_pinch < 0.075 or (is_pinching and dist_pinch < 0.090)) and not is_open_palm:
+                        mp_history = []
                         mp_prev_point_x = None
                         mp_prev_point_y = None
 
-                        if current_time - mp_last_gesture_time >= 0.65:
-                            mp_history.append((wrist.x, current_time))
-                            if len(mp_history) > 6:
-                                mp_history.pop(0)
+                        if not is_pinching:
+                            is_pinching = True
+                            pinch_start_time = current_time
 
-                            if len(mp_history) >= 2:
-                                dx_total = mp_history[-1][0] - mp_history[0][0]
-                                dt_total = mp_history[-1][1] - mp_history[0][1]
-
-                                if 0.04 <= dt_total <= 0.65:
-                                    if dx_total > 0.05: # Swipe Right across camera
-                                        print("[Camera Gesture - MediaPipe AI] Open Palm Swipe Right -> Next Track", flush=True)
-                                        socketio.emit('gesture_trigger', {'type': 'next'})
-                                        mp_last_gesture_time = current_time
-                                        mp_history = []
-                                        return
-                                    elif dx_total < -0.05: # Swipe Left across camera
-                                        print("[Camera Gesture - MediaPipe AI] Open Palm Swipe Left -> Previous Track", flush=True)
-                                        socketio.emit('gesture_trigger', {'type': 'prev'})
-                                        mp_last_gesture_time = current_time
-                                        mp_history = []
-                                        return
+                        # Pinch held > 0.20s -> Enter PINCH DRAG SEEK MODE!
+                        if current_time - pinch_start_time > 0.20:
+                            if current_time - mp_last_seek_time > 0.08:
+                                progress_ratio = 1.0 - index_tip.x
+                                progress_ratio = max(0.0, min(1.0, progress_ratio))
+                                print(f"[Camera Gesture - MediaPipe AI] Pinch Drag Seeking to {int(progress_ratio*100)}%", flush=True)
+                                socketio.emit('gesture_trigger', {'type': 'seek', 'value': progress_ratio})
+                                mp_last_seek_time = current_time
                         return
+                    else:
+                        # Pinch just released
+                        if is_pinching:
+                            pinch_duration = current_time - pinch_start_time
+                            is_pinching = False
+                            if pinch_duration < 0.35: # Quick pinch tap -> Play/Pause
+                                print("[Camera Gesture - MediaPipe AI] Quick Pinch Tap! -> Play/Pause Toggle", flush=True)
+                                socketio.emit('gesture_trigger', {'type': 'play_pause'})
+                                mp_last_gesture_time = current_time
+                                mp_history = []
+                                return
 
                     # --- 2. INDEX FINGER POINTING (3D Cube Space Touch Rotation) ---
                     if is_index_only and dist_pinch > 0.08:
-                        is_pinching = False
                         mp_history = []
                         curr_px = 1.0 - index_tip.x # Mirrored X
                         curr_py = index_tip.y
@@ -211,31 +211,31 @@ def process_motion_gesture(frame):
                         mp_prev_point_x = None
                         mp_prev_point_y = None
 
-                    # --- 3. PINCH DETECTED (Seek & Play/Pause) ---
-                    if dist_pinch < 0.052 and not is_open_palm:
-                        mp_history = []
-                        if not is_pinching:
-                            is_pinching = True
-                            pinch_start_time = current_time
+                    # --- 3. OPEN HAND SWIPE DETECTION (Next/Prev Song) ---
+                    if is_open_palm and dist_pinch > 0.08:
+                        if current_time - mp_last_gesture_time >= 0.65:
+                            mp_history.append((wrist.x, current_time))
+                            if len(mp_history) > 6:
+                                mp_history.pop(0)
 
-                        if current_time - pinch_start_time > 0.22:
-                            if current_time - mp_last_seek_time > 0.08:
-                                progress_ratio = 1.0 - index_tip.x
-                                progress_ratio = max(0.0, min(1.0, progress_ratio))
-                                print(f"[Camera Gesture - MediaPipe AI] Pinch Drag Seeking to {int(progress_ratio*100)}%", flush=True)
-                                socketio.emit('gesture_trigger', {'type': 'seek', 'value': progress_ratio})
-                                mp_last_seek_time = current_time
+                            if len(mp_history) >= 2:
+                                dx_total = mp_history[-1][0] - mp_history[0][0]
+                                dt_total = mp_history[-1][1] - mp_history[0][1]
+
+                                if 0.04 <= dt_total <= 0.65:
+                                    if dx_total > 0.05: # Swipe Right across camera
+                                        print("[Camera Gesture - MediaPipe AI] Open Palm Swipe Right -> Next Track", flush=True)
+                                        socketio.emit('gesture_trigger', {'type': 'next'})
+                                        mp_last_gesture_time = current_time
+                                        mp_history = []
+                                        return
+                                    elif dx_total < -0.05: # Swipe Left across camera
+                                        print("[Camera Gesture - MediaPipe AI] Open Palm Swipe Left -> Previous Track", flush=True)
+                                        socketio.emit('gesture_trigger', {'type': 'prev'})
+                                        mp_last_gesture_time = current_time
+                                        mp_history = []
+                                        return
                         return
-                    else:
-                        if is_pinching:
-                            pinch_duration = current_time - pinch_start_time
-                            is_pinching = False
-                            if pinch_duration < 0.35:
-                                print("[Camera Gesture - MediaPipe AI] Quick Pinch Tap! -> Play/Pause Toggle", flush=True)
-                                socketio.emit('gesture_trigger', {'type': 'play_pause'})
-                                mp_last_gesture_time = current_time
-                                mp_history = []
-                                return
             else:
                 is_pinching = False
                 mp_history = []
