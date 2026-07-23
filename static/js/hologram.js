@@ -356,19 +356,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     opacity: targetCubeOpacity
                 });
 
-                const edgeMaterial = new THREE.MeshBasicMaterial({
-                    color: 0x111625,
-                    transparent: true,
-                    opacity: 0.6
-                });
-
                 hologramCube.material = [
-                    edgeMaterial,  // right (thin edge)
-                    edgeMaterial,  // left (thin edge)
-                    edgeMaterial,  // top (thin edge)
-                    edgeMaterial,  // bottom (thin edge)
-                    coverMaterial, // front (album cover)
-                    coverMaterial  // back (album cover)
+                    coverMaterial, // right
+                    coverMaterial, // left
+                    coverMaterial, // top
+                    coverMaterial, // bottom
+                    coverMaterial, // front
+                    coverMaterial  // back
                 ];
             }
         });
@@ -500,22 +494,17 @@ document.addEventListener('DOMContentLoaded', () => {
         scene = new THREE.Scene();
         scene.background = new THREE.Color(0x000000); // Black room for hologram reflection
 
-        // 3D Album Art Object (Slim 3D Album Card)
-        const geometry = new THREE.BoxGeometry(2.2, 2.2, 0.12);
+        // 3D Album Art Object (Cube representing album block)
+        const geometry = new THREE.BoxGeometry(2.0, 2.0, 2.0);
         const coverMaterial = new THREE.MeshBasicMaterial({
             color: 0x222222,
             transparent: true,
             opacity: 1.0
         });
-        const edgeMaterial = new THREE.MeshBasicMaterial({
-            color: 0x111625,
-            transparent: true,
-            opacity: 0.6
-        });
         const initialMaterial = [
-            edgeMaterial, edgeMaterial, // right, left (thin edges)
-            edgeMaterial, edgeMaterial, // top, bottom (thin edges)
-            coverMaterial, coverMaterial // front, back (album cover)
+            coverMaterial, coverMaterial, // right, left
+            coverMaterial, coverMaterial, // top, bottom
+            coverMaterial, coverMaterial  // front, back
         ];
 
         hologramCube = new THREE.Mesh(geometry, initialMaterial);
@@ -924,14 +913,16 @@ document.addEventListener('DOMContentLoaded', () => {
             renderer.setScissor(cx + viewSize * 0.5, cy - viewSize / 2, viewSize, viewSize);
             renderer.render(scene, cameraEast);
         } else {
-            // Single Square 1:1 Center Viewport Mode (Default Display Mode)
-            const scale = window.singleModeScale || 0.70; // 70% size of screen min dimension
-            const singleSize = Math.min(w, h) * scale;
-            const vx = (w - singleSize) / 2;
-            const vy = (h - singleSize) / 2;
-
-            renderer.setViewport(vx, vy, singleSize, singleSize);
-            renderer.setScissor(vx, vy, singleSize, singleSize);
+            // Single Viewport Mode (Full Canvas Projection without black scissor cropping)
+            renderer.setScissorTest(false);
+            renderer.setViewport(0, 0, w, h);
+            
+            // Dynamically match camera aspect ratio to screen dimensions
+            if (cameraMain.aspect !== w / h) {
+                cameraMain.aspect = w / h;
+                cameraMain.updateProjectionMatrix();
+            }
+            
             renderer.render(scene, cameraMain);
         }
     }
