@@ -403,17 +403,22 @@ def gen_camera_frames():
     # 2. Fallback to OpenCV V4L2 device probing
     try:
         import cv2
+        import sys
         cap = None
-        for idx in [20, 19, 21, 0, 1]:
-            temp_cap = cv2.VideoCapture(idx, cv2.CAP_V4L2) if hasattr(cv2, 'CAP_V4L2') else cv2.VideoCapture(idx)
-            if temp_cap.isOpened():
-                temp_cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
-                ret, test_frame = temp_cap.read()
-                if ret and test_frame is not None:
-                    cap = temp_cap
-                    print(f"[Camera Stream] Successfully opened camera device index: {idx}")
-                    break
-                temp_cap.release()
+        # On macOS (darwin), only probe index 0 to prevent hardware timeout blocking
+        probe_indices = [0] if sys.platform == 'darwin' else [0, 1, 20, 19, 21]
+        for idx in probe_indices:
+            try:
+                temp_cap = cv2.VideoCapture(idx)
+                if temp_cap and temp_cap.isOpened():
+                    ret, test_frame = temp_cap.read()
+                    if ret and test_frame is not None:
+                        cap = temp_cap
+                        print(f"[Camera Stream] Successfully opened camera device index: {idx}", flush=True)
+                        break
+                    temp_cap.release()
+            except Exception:
+                pass
         
         if not cap or not cap.isOpened():
             print("[Camera Stream] Cannot open camera device. Displaying status banner.")
@@ -800,4 +805,4 @@ def handle_remote_chat(data):
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5001))
     print(f"Starting Hologram Speaker Server on http://0.0.0.0:{port} ...")
-    socketio.run(app, debug=True, host='::', port=port)
+    socketio.run(app, debug=False, host='0.0.0.0', port=port, allow_unsafe_werkzeug=True)

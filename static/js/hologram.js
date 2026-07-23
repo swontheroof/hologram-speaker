@@ -108,7 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentUtterance = null; // Prevent SpeechSynthesisUtterance GC bug
     let wasPlayingBeforeGemini = false; // Save music playing state before voice session
     let geminiScalePulse = 1.0;
-    let cameraNorth, cameraSouth, cameraEast, cameraWest;
+    let cameraMain, cameraNorth, cameraSouth, cameraEast, cameraWest;
     let textureLoader = new THREE.TextureLoader();
     let currentTexture = null;
 
@@ -614,30 +614,31 @@ document.addEventListener('DOMContentLoaded', () => {
         lightCursor = new THREE.Mesh(cursorGeo, cursorMat);
         hologramCube.add(lightCursor);
 
-        // 4 Cameras facing the center from North, South, East, West
+        // Main front camera for single square viewport rendering
         const aspect = 1;
-        const size = 3;
-        const dist = 5.0; // Distance of cameras from center
+        const dist = 5.0; // Distance of camera from center
 
-        // cameraSouth: bottom viewport on screen (bottom of album points UP towards center)
+        cameraMain = new THREE.PerspectiveCamera(45, aspect, 0.1, 20);
+        cameraMain.position.set(0, 0, dist);
+        cameraMain.up.set(0, 1, 0);
+        cameraMain.lookAt(0, 0, 0);
+
+        // 4 Cameras facing the center from North, South, East, West (kept for fallback)
         cameraSouth = new THREE.PerspectiveCamera(45, aspect, 0.1, 20);
         cameraSouth.position.set(0, 0, dist);
         cameraSouth.up.set(0, -1, 0);
         cameraSouth.lookAt(0, 0, 0);
 
-        // cameraNorth: top viewport on screen (bottom of album points DOWN towards center)
         cameraNorth = new THREE.PerspectiveCamera(45, aspect, 0.1, 20);
         cameraNorth.position.set(0, 0, -dist);
         cameraNorth.up.set(0, 1, 0);
         cameraNorth.lookAt(0, 0, 0);
 
-        // cameraWest: left viewport on screen (bottom of album points RIGHT towards center)
         cameraWest = new THREE.PerspectiveCamera(45, aspect, 0.1, 20);
         cameraWest.position.set(-dist, 0, 0);
         cameraWest.up.set(0, 0, 1);
         cameraWest.lookAt(0, 0, 0);
 
-        // cameraEast: right viewport on screen (bottom of album points LEFT towards center)
         cameraEast = new THREE.PerspectiveCamera(45, aspect, 0.1, 20);
         cameraEast.position.set(dist, 0, 0);
         cameraEast.up.set(0, 0, 1);
@@ -647,8 +648,6 @@ document.addEventListener('DOMContentLoaded', () => {
         window.addEventListener('resize', onWindowResize);
         onWindowResize();
 
-
-
         // Start Animation Loop
         renderer.setAnimationLoop(animate);
     }
@@ -657,9 +656,11 @@ document.addEventListener('DOMContentLoaded', () => {
         renderer.setSize(window.innerWidth, window.innerHeight);
 
         // Update aspect ratios of cameras if window changes
-        [cameraNorth, cameraSouth, cameraEast, cameraWest].forEach(cam => {
-            cam.aspect = 1; // Always keep viewports square
-            cam.updateProjectionMatrix();
+        [cameraMain, cameraNorth, cameraSouth, cameraEast, cameraWest].forEach(cam => {
+            if (cam) {
+                cam.aspect = 1; // Always keep viewports square
+                cam.updateProjectionMatrix();
+            }
         });
     }
 
@@ -878,7 +879,7 @@ document.addEventListener('DOMContentLoaded', () => {
             visualizerRing.position.y = floatOffset;
         }
 
-        // C. Divide WebGL context based on View Mode (QUAD 4-Face vs SINGLE 1-Face East)
+        // C. Single Center Square Viewport Mode (Default 1:1 Projection)
         const w = window.innerWidth;
         const h = window.innerHeight;
 
@@ -889,19 +890,8 @@ document.addEventListener('DOMContentLoaded', () => {
         renderer.clear();
         renderer.setScissorTest(true);
 
-        if (window.hologramViewMode === 'SINGLE_EAST') {
-            // Single 1-Face Mode (East View shifted to right side with custom size)
-            const scale = window.singleModeScale || 0.48; // default 48% size
-            const offsetXRatio = (window.singleModeOffsetX !== undefined) ? window.singleModeOffsetX : 0.30; // shifted to East side
-            const singleSize = Math.min(w, h) * scale;
-            const vx = cx + (Math.min(w, h) * offsetXRatio) - (singleSize / 2);
-            const vy = cy - (singleSize / 2);
-
-            renderer.setViewport(vx, vy, singleSize, singleSize);
-            renderer.setScissor(vx, vy, singleSize, singleSize);
-            renderer.render(scene, cameraEast);
-        } else {
-            // Quad 4-Face Pyramid Mode (Default)
+        if (window.hologramViewMode === 'QUAD_PYRAMID') {
+            // Quad 4-Face Pyramid Mode (Legacy Optional)
             const viewSize = Math.min(w, h) * 0.28;
 
             // 1. SOUTH (Bottom view)
@@ -923,11 +913,16 @@ document.addEventListener('DOMContentLoaded', () => {
             renderer.setViewport(cx + viewSize * 0.5, cy - viewSize / 2, viewSize, viewSize);
             renderer.setScissor(cx + viewSize * 0.5, cy - viewSize / 2, viewSize, viewSize);
             renderer.render(scene, cameraEast);
+        } else {
+            // Single Square 1:1 Center Viewport Mode (Default Display Mode)
+            const scale = window.singleModeScale || 0.70; // 70% size of screen min dimension
+            const singleSize = Math.min(w, h) * scale;
+            const vx = (w - singleSize) / 2;
+            const vy = (h - singleSize) / 2;
 
-            // Draw crosshair alignment guides if enabled
-            if (showGuides) {
-                drawCalibrationGuides(cx, cy, viewSize);
-            }
+            renderer.setViewport(vx, vy, singleSize, singleSize);
+            renderer.setScissor(vx, vy, singleSize, singleSize);
+            renderer.render(scene, cameraMain);
         }
     }
 
