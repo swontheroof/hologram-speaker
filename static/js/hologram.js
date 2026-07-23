@@ -350,20 +350,25 @@ document.addEventListener('DOMContentLoaded', () => {
         textureLoader.load(song.cover, (texture) => {
             currentTexture = texture;
             if (hologramCube) {
-                // Apply texture to front and back faces (materials index 4 and 5 in box mapping)
                 const coverMaterial = new THREE.MeshBasicMaterial({
                     map: texture,
                     transparent: true,
                     opacity: targetCubeOpacity
                 });
 
+                const edgeMaterial = new THREE.MeshBasicMaterial({
+                    color: 0x111625,
+                    transparent: true,
+                    opacity: 0.6
+                });
+
                 hologramCube.material = [
-                    coverMaterial, // right
-                    coverMaterial, // left
-                    coverMaterial, // top
-                    coverMaterial, // bottom
-                    coverMaterial, // front
-                    coverMaterial  // back
+                    edgeMaterial,  // right (thin edge)
+                    edgeMaterial,  // left (thin edge)
+                    edgeMaterial,  // top (thin edge)
+                    edgeMaterial,  // bottom (thin edge)
+                    coverMaterial, // front (album cover)
+                    coverMaterial  // back (album cover)
                 ];
             }
         });
@@ -495,17 +500,22 @@ document.addEventListener('DOMContentLoaded', () => {
         scene = new THREE.Scene();
         scene.background = new THREE.Color(0x000000); // Black room for hologram reflection
 
-        // 3D Album Art Object (Cube representing album block)
-        const geometry = new THREE.BoxGeometry(2.0, 2.0, 2.0);
+        // 3D Album Art Object (Slim 3D Album Card)
+        const geometry = new THREE.BoxGeometry(2.2, 2.2, 0.12);
         const coverMaterial = new THREE.MeshBasicMaterial({
             color: 0x222222,
             transparent: true,
             opacity: 1.0
         });
+        const edgeMaterial = new THREE.MeshBasicMaterial({
+            color: 0x111625,
+            transparent: true,
+            opacity: 0.6
+        });
         const initialMaterial = [
-            coverMaterial, coverMaterial, // right, left
-            coverMaterial, coverMaterial, // top, bottom
-            coverMaterial, coverMaterial  // front, back
+            edgeMaterial, edgeMaterial, // right, left (thin edges)
+            edgeMaterial, edgeMaterial, // top, bottom (thin edges)
+            coverMaterial, coverMaterial // front, back (album cover)
         ];
 
         hologramCube = new THREE.Mesh(geometry, initialMaterial);
