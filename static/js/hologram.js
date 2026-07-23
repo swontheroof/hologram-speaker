@@ -2040,9 +2040,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } else if (actionType === 'gemini_toggle') {
             if (HologramStateManager.currentMode !== 'GEMINI') {
-                console.log("👍 [Thumbs-Up Gesture] Entering Gemini AI Mode via toggleGeminiMode()...");
-                toggleGeminiMode();
+                console.log("👍 [Thumbs-Up Gesture] Emitting gemini_button websocket event...");
                 gestureStatus.textContent = '👍 엄지 척! 제미나이 AI 모드 시작... 🤖';
+                if (socket && socket.connected) {
+                    socket.emit('gemini_button');
+                }
             }
         }
     });
