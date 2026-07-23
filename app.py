@@ -139,22 +139,38 @@ def process_motion_gesture(frame):
                     index_pip = hand_landmarks.landmark[6]
                     middle_tip = hand_landmarks.landmark[12]
                     middle_pip = hand_landmarks.landmark[10]
+                    middle_mcp = hand_landmarks.landmark[9]
                     ring_tip = hand_landmarks.landmark[16]
                     ring_pip = hand_landmarks.landmark[14]
                     wrist = hand_landmarks.landmark[0]
 
+                    # 1. Calculate Hand Physical Size (Wrist to Middle MCP)
+                    hand_size = np.hypot(wrist.x - middle_mcp.x, wrist.y - middle_mcp.y)
+
+                    # --- PROXIMITY GUARD: Ignore hands that are too far away (< 0.13 of frame) ---
+                    if hand_size < 0.13:
+                        is_pinching = False
+                        mp_prev_point_x = None
+                        mp_prev_point_y = None
+                        mp_history = []
+                        return
+
+                    # 2. Calculate Scale-Invariant Pinch Ratio
                     dist_pinch = np.hypot(thumb_tip.x - index_tip.x, thumb_tip.y - index_tip.y)
+                    pinch_ratio = dist_pinch / max(0.01, hand_size)
 
                     # Multi-joint Finger Posture Analysis
                     is_index_extended = index_tip.y < index_pip.y
                     is_middle_extended = middle_tip.y < middle_pip.y
                     is_ring_extended = ring_tip.y < ring_pip.y
-
                     is_open_palm = is_index_extended and is_middle_extended and is_ring_extended
                     is_index_only = is_index_extended and (not is_middle_extended) and (not is_ring_extended)
 
-                    # --- 1. PINCH & PINCH-DRAG SEEK (Hysteresis: Enter 0.075, Hold until 0.090) ---
-                    if (dist_pinch < 0.075 or (is_pinching and dist_pinch < 0.090)) and not is_open_palm:
+                    # --- BOUNDARY GUARD: Suppress swipe when hand is near frame edges ---
+                    is_near_edge = (wrist.x < 0.12 or wrist.x > 0.88 or wrist.y < 0.10 or wrist.y > 0.90)
+
+                    # --- 1. PINCH & PINCH-DRAG SEEK (Scale-Invariant Hysteresis) ---
+                    if (pinch_ratio < 0.28 or (is_pinching and pinch_ratio < 0.40)) and not is_open_palm and not is_near_edge:
                         mp_history = []
                         mp_prev_point_x = None
                         mp_prev_point_y = None
@@ -168,7 +184,7 @@ def process_motion_gesture(frame):
                             if current_time - mp_last_seek_time > 0.08:
                                 progress_ratio = 1.0 - index_tip.x
                                 progress_ratio = max(0.0, min(1.0, progress_ratio))
-                                print(f"[Camera Gesture - MediaPipe AI] Pinch Drag Seeking to {int(progress_ratio*100)}%", flush=True)
+                                print(f"[Camera Gesture - MediaPipe AI] Scale-Invariant Pinch Drag Seeking to {int(progress_ratio*100)}%", flush=True)
                                 socketio.emit('gesture_trigger', {'type': 'seek', 'value': progress_ratio})
                                 mp_last_seek_time = current_time
                         return
@@ -185,7 +201,7 @@ def process_motion_gesture(frame):
                                 return
 
                     # --- 2. INDEX FINGER POINTING (3D Cube Space Touch Rotation) ---
-                    if is_index_only and dist_pinch > 0.08:
+                    if is_index_only and pinch_ratio > 0.35 and not is_near_edge:
                         mp_history = []
                         curr_px = 1.0 - index_tip.x # Mirrored X
                         curr_py = index_tip.y
@@ -212,8 +228,12 @@ def process_motion_gesture(frame):
                         mp_prev_point_y = None
 
                     # --- 3. OPEN HAND SWIPE DETECTION (Next/Prev Song) ---
-                    if is_open_palm and dist_pinch > 0.08:
-                        if current_time - mp_last_gesture_time >= 0.65:
+                    if is_open_palm and pinch_ratio > 0.35:
+                        if is_near_edge:
+                            mp_history = []
+                            return
+
+                        if current_time - mp_last_gesture_time >= 1.0:
                             mp_history.append((wrist.x, current_time))
                             if len(mp_history) > 6:
                                 mp_history.pop(0)

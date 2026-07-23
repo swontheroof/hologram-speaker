@@ -398,15 +398,18 @@
                 <input type="checkbox" id="toggle-webcam">
             </div>
 
-            <div class="setting-row" style="margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center;">
+            <div class="setting-row"
+                style="margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center;">
                 <label style="font-weight: 600;">📐 홀로그램 화면 모드</label>
-                <button type="button" id="btn-toggle-view-mode" style="background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; border: none; padding: 8px 14px; border-radius: 8px; font-weight: 600; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 12px rgba(99,102,241,0.3);">
+                <button type="button" id="btn-toggle-view-mode"
+                    style="background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; border: none; padding: 8px 14px; border-radius: 8px; font-weight: 600; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 12px rgba(99,102,241,0.3);">
                     📐 4면 피라미드 모드
                 </button>
             </div>
 
             <!-- Single View Mode Fine-tuning Sliders -->
-            <div id="single-mode-controls" style="display: none; margin-top: 10px; padding: 12px; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+            <div id="single-mode-controls"
+                style="display: none; margin-top: 10px; padding: 12px; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
                 <div class="setting-row">
                     <label for="slider-single-scale">🔍 1면 홀로그램 크기 (10% ~ 130%)</label>
                     <input type="range" id="slider-single-scale" min="0.10" max="1.30" step="0.01" value="0.48">
@@ -414,14 +417,6 @@
                 <div class="setting-row" style="margin-top: 8px;">
                     <label for="slider-single-offset-x">↔️ 1면 좌우 위치 (East Side)</label>
                     <input type="range" id="slider-single-offset-x" min="-0.60" max="0.60" step="0.01" value="0.30">
-                </div>
-                <div class="setting-row" style="margin-top: 8px;">
-                    <label for="slider-single-offset-y">↕️ 1면 상하 위치 (Y-Offset)</label>
-                    <input type="range" id="slider-single-offset-y" min="-0.50" max="0.50" step="0.01" value="0.00">
-                </div>
-                <div class="setting-row" style="margin-top: 8px;">
-                    <label for="slider-single-zoom">🔎 3D 카메라 거리 / Zoom (잘림 방지)</label>
-                    <input type="range" id="slider-single-zoom" min="0.50" max="2.00" step="0.02" value="1.00">
                 </div>
             </div>
         </section>
@@ -518,7 +513,7 @@
                 if (!urlStr) return '';
                 try {
                     return new URL(urlStr, window.location.href).pathname;
-                } catch(e) {
+                } catch (e) {
                     return urlStr;
                 }
             }
@@ -537,7 +532,7 @@
             if (state.currentTime !== undefined && (state.currentTime > 0 || !state.isPlaying)) {
                 remoteCurrentTime = state.currentTime;
             }
-            if (state.hologramViewMode && !isUserDraggingSlider) {
+            if (state.hologramViewMode) {
                 updateViewModeUI(state.hologramViewMode);
             }
             isRemotePlaying = !!state.isPlaying;
@@ -650,13 +645,10 @@
 
         // 5. Hologram View Mode Toggle (QUAD vs SINGLE_EAST)
         let currentHologramViewMode = 'QUAD';
-        let isUserDraggingSlider = false;
         const btnToggleViewMode = document.getElementById('btn-toggle-view-mode');
         const singleModeControls = document.getElementById('single-mode-controls');
         const sliderSingleScale = document.getElementById('slider-single-scale');
         const sliderSingleOffsetX = document.getElementById('slider-single-offset-x');
-        const sliderSingleOffsetY = document.getElementById('slider-single-offset-y');
-        const sliderSingleZoom = document.getElementById('slider-single-zoom');
 
         function updateViewModeUI(mode) {
             currentHologramViewMode = mode;
@@ -679,27 +671,13 @@
 
         function emitSingleModeParams() {
             socket.emit('remote_setting_change', {
-                viewMode: 'SINGLE_EAST',
                 singleScale: parseFloat(sliderSingleScale.value),
-                singleOffsetX: parseFloat(sliderSingleOffsetX.value),
-                singleOffsetY: parseFloat(sliderSingleOffsetY.value),
-                singleZoom: parseFloat(sliderSingleZoom.value)
+                singleOffsetX: parseFloat(sliderSingleOffsetX.value)
             });
         }
 
-        [sliderSingleScale, sliderSingleOffsetX, sliderSingleOffsetY, sliderSingleZoom].forEach(slider => {
-            slider.addEventListener('mousedown', () => { isUserDraggingSlider = true; });
-            slider.addEventListener('touchstart', () => { isUserDraggingSlider = true; });
-            slider.addEventListener('input', emitSingleModeParams);
-            slider.addEventListener('change', () => {
-                isUserDraggingSlider = false;
-                emitSingleModeParams();
-            });
-            slider.addEventListener('touchend', () => {
-                isUserDraggingSlider = false;
-                emitSingleModeParams();
-            });
-        });
+        sliderSingleScale.addEventListener('input', emitSingleModeParams);
+        sliderSingleOffsetX.addEventListener('input', emitSingleModeParams);
 
         // 6. Live Camera Stream preview toggle
         const btnToggleCamStream = document.getElementById('btn-toggle-camera-stream');

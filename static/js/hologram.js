@@ -892,24 +892,15 @@ document.addEventListener('DOMContentLoaded', () => {
         renderer.setScissorTest(true);
 
         if (window.hologramViewMode === 'SINGLE_EAST') {
-            // Single 1-Face Mode (East View with customizable scale, position X/Y, and camera zoom)
-            const scale = window.singleModeScale || 0.48;
-            const offsetXRatio = (window.singleModeOffsetX !== undefined) ? window.singleModeOffsetX : 0.30;
-            const offsetYRatio = (window.singleModeOffsetY !== undefined) ? window.singleModeOffsetY : 0.0;
-            const zoom = window.singleModeZoom || 1.0;
-
-            // Dynamically set camera distance so 3D objects are never truncated by camera frustum
-            const baseDist = 5.0;
-            if (cameraEast) {
-                cameraEast.position.set(baseDist * zoom, 0, 0);
-            }
-
+            // Single 1-Face Mode (East View shifted to right side with custom size)
+            const scale = window.singleModeScale || 0.48; // default 48% size
+            const offsetXRatio = (window.singleModeOffsetX !== undefined) ? window.singleModeOffsetX : 0.30; // shifted to East side
             const singleSize = Math.min(w, h) * scale;
             const vx = cx + (Math.min(w, h) * offsetXRatio) - (singleSize / 2);
-            const vy = cy + (Math.min(w, h) * offsetYRatio) - (singleSize / 2);
+            const vy = cy - (singleSize / 2);
 
             renderer.setViewport(vx, vy, singleSize, singleSize);
-            renderer.setScissor(0, 0, w, h); // Scissor full screen so 3D meshes/visualizer rings never clip!
+            renderer.setScissor(vx, vy, singleSize, singleSize);
             renderer.render(scene, cameraEast);
         } else {
             // Quad 4-Face Pyramid Mode (Default)
@@ -1867,30 +1858,29 @@ document.addEventListener('DOMContentLoaded', () => {
             isTouchActive = data.touch !== undefined ? data.touch : true;
             isGrabActive = data.grab !== undefined ? data.grab : false;
 
+            // Sync absolute cursor position if provided in hardware packet
             if (data.x !== undefined) handX = 1.0 - data.x;
             if (data.y !== undefined) handY = data.y;
 
+            // Set flag to true temporarily so automatic spin doesn't conflict
             isGestureDragging = isTouchActive;
 
+            // Clear dragging flag after a short timeout of inactive packets
             if (window.hwRotateTimeout) clearTimeout(window.hwRotateTimeout);
             window.hwRotateTimeout = setTimeout(() => {
                 isGestureDragging = false;
                 isTouchActive = false;
                 isGrabActive = false;
-                rotVelY *= 0.5;
-                rotVelX *= 0.5;
-            }, 200);
+            }, 180); // slightly longer buffer for wireless latency
 
             const sensitivity = dragSensitivity;
-            // Smooth target velocity LERP for 60 FPS fluid rotation
-            const targetY = Math.max(-0.22, Math.min(0.22, dx * sensitivity * 0.35));
-            const targetX = Math.max(-0.22, Math.min(0.22, dy * sensitivity * 0.35));
-            
-            rotVelY += (targetY - rotVelY) * 0.40;
-            rotVelX += (targetX - rotVelX) * 0.40;
+            hologramCube.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), dx * sensitivity);
+            hologramCube.rotateOnWorldAxis(new THREE.Vector3(1, 0, 0), dy * sensitivity);
 
-            hologramCube.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), rotVelY);
-            hologramCube.rotateOnWorldAxis(new THREE.Vector3(1, 0, 0), rotVelX);
+            const maxInertia = 0.20;
+            rotVelY = Math.max(-maxInertia, Math.min(maxInertia, dx * sensitivity * 0.50));
+            rotVelX = Math.max(-maxInertia, Math.min(maxInertia, dy * sensitivity * 0.50));
+            rotVelZ = Math.max(-maxInertia * 0.3, Math.min(maxInertia * 0.3, (dx + dy) * sensitivity * 0.10));
 
             lastInteractionTime = Date.now();
             if (isGrabActive) {
@@ -1915,17 +1905,7 @@ document.addEventListener('DOMContentLoaded', () => {
             gestureStatus.textContent = 'HW 제스처: 재생/일시정지 토글';
         } else if (actionType === 'seek') {
             if (audio.duration) {
-                const targetTime = velocity * audio.duration;
-                // Defer audio.currentTime assignment to prevent audio buffer stuttering during continuous pinch drag
-                if (Math.abs(audio.currentTime - targetTime) > 2.0 || !window.seekAudioDebounce) {
-                    audio.currentTime = targetTime;
-                }
-                if (window.seekAudioDebounce) clearTimeout(window.seekAudioDebounce);
-                window.seekAudioDebounce = setTimeout(() => {
-                    audio.currentTime = targetTime;
-                    window.seekAudioDebounce = null;
-                }, 180);
-
+                audio.currentTime = velocity * audio.duration;
                 gestureStatus.textContent = `HW 제스처: 곡 재생구간 이동 (${Math.round(velocity * 100)}%)`;
                 syncPlayerState();
             }
@@ -1945,12 +1925,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (data.singleOffsetX !== undefined) {
             window.singleModeOffsetX = parseFloat(data.singleOffsetX);
-        }
-        if (data.singleOffsetY !== undefined) {
-            window.singleModeOffsetY = parseFloat(data.singleOffsetY);
-        }
-        if (data.singleZoom !== undefined) {
-            window.singleModeZoom = parseFloat(data.singleZoom);
         }
         if (data.friction !== undefined) {
             frictionSlider.value = data.friction;
