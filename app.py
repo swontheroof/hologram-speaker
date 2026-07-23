@@ -571,29 +571,41 @@ def find_usb_mic_device():
         for line in out.splitlines():
             if "card" in line and ("USB" in line or "Codec" in line or "PnP" in line):
                 card_num = line.split("card")[1].split(":")[0].strip()
-                print(f"[USB Mic Auto-Detect] Found USB Audio Card {card_num} -> Using plughw:{card_num},0", flush=True)
-                return f"plughw:{card_num},0"
+                print(f"[USB Mic Auto-Detect] Found USB Audio Card {card_num}", flush=True)
+                return [f"plughw:{card_num},0", "default", "pulse", f"hw:{card_num},0"]
     except Exception as e:
         print(f"[USB Mic Find Error] {e}", flush=True)
-    return "plughw:2,0"
+    return ["default", "plughw:2,0", "pulse", "hw:2,0"]
 
 def record_and_process_audio():
     import base64
-    mic_dev = find_usb_mic_device()
-    print(f"[Gemini Mic] Recording 4.0s audio from USB Mic ({mic_dev})...", flush=True)
+    mic_dev_candidates = find_usb_mic_device()
     wav_path = "/tmp/gemini_input.wav"
+    captured = False
+    used_device = None
+
+    for mic_dev in mic_dev_candidates:
+        print(f"[Gemini Mic] Trying audio capture with device '{mic_dev}'...", flush=True)
+        try:
+            res = subprocess.run(["arecord", "-D", mic_dev, "-f", "S16_LE", "-r", "16000", "-c", "1", "-d", "4", wav_path], capture_output=True, text=True, timeout=6)
+            if os.path.exists(wav_path) and os.path.getsize(wav_path) > 2000:
+                captured = True
+                used_device = mic_dev
+                print(f"[Gemini Mic] Capture successful with '{mic_dev}'! File size: {os.path.getsize(wav_path)} bytes.", flush=True)
+                break
+            else:
+                print(f"[Gemini Mic] Device '{mic_dev}' failed or empty. Stderr: {res.stderr.strip()}", flush=True)
+        except Exception as e:
+            print(f"[Gemini Mic] Error with device '{mic_dev}': {e}", flush=True)
+
+    if not captured:
+        print("[Gemini Mic Error] All recording devices failed!", flush=True)
+        socketio.emit('gemini_mic_response', {'response': "마이크 녹음에 실패했습니다. alsamixer에서 USB 마이크가 켜져 있는지 확인해 주세요."})
+        return
+
+    socketio.emit('gemini_mic_state', {'state': 'THINKING'})
+
     try:
-        # Use plughw device with 44100Hz mono for 100% ALSA hardware compatibility
-        res = subprocess.run(["arecord", "-D", mic_dev, "-f", "S16_LE", "-r", "44100", "-c", "1", "-d", "4", wav_path], capture_output=True, text=True)
-        print(f"[Gemini Mic] arecord result: {res.returncode}, stderr: {res.stderr}", flush=True)
-
-        if not os.path.exists(wav_path) or os.path.getsize(wav_path) < 1000:
-            raise Exception("arecord failed to capture valid audio file")
-
-        file_size = os.path.getsize(wav_path)
-        print(f"[Gemini Mic] Audio recording finished! File size: {file_size} bytes. Processing with Gemini...", flush=True)
-        socketio.emit('gemini_mic_state', {'state': 'THINKING'})
-        
         with open(wav_path, "rb") as f:
             audio_bytes = f.read()
         audio_b64 = base64.b64encode(audio_bytes).decode('utf-8')
@@ -658,6 +670,46 @@ def record_and_process_audio():
     except Exception as e:
         print(f"[Gemini Mic Error] {e}", flush=True)
         socketio.emit('gemini_mic_response', {'response': f"마이크 처리 중 오류가 발생했습니다: {e}"})
+
+@app.route('/api/debug_mic')
+def debug_mic():
+    import struct
+    results = {}
+    try:
+        r1 = subprocess.run(["arecord", "-l"], capture_output=True, text=True)
+        results['arecord_l'] = r1.stdout
+    except Exception as e:
+        results['arecord_l_err'] = str(e)
+
+    wav_path = "/tmp/debug_mic.wav"
+    capture_success = False
+    used_dev = None
+
+    for dev in ["default", "pulse", "plughw:2,0", "hw:2,0"]:
+        try:
+            r2 = subprocess.run(["arecord", "-D", dev, "-f", "S16_LE", "-r", "16000", "-c", "1", "-d", "2", wav_path], capture_output=True, text=True, timeout=5)
+            if os.path.exists(wav_path) and os.path.getsize(wav_path) > 1000:
+                capture_success = True
+                used_dev = dev
+                results['capture_log'] = f"Success using device '{dev}', file size: {os.path.getsize(wav_path)} bytes"
+                break
+            else:
+                results[f'capture_{dev}_err'] = f"returncode: {r2.returncode}, stderr: {r2.stderr.strip()}"
+        except Exception as e:
+            results[f'capture_{dev}_err'] = str(e)
+
+    if capture_success and os.path.exists(wav_path):
+        try:
+            with open(wav_path, "rb") as f:
+                raw_data = f.read()[44:]
+            samples = struct.unpack(f"<{len(raw_data)//2}h", raw_data)
+            rms = (sum(s**2 for s in samples) / len(samples)) ** 0.5 if samples else 0
+            results['audio_rms_volume'] = f"{rms:.2f} (RMS energy: >50 means voice recorded, <10 means mute/silence)"
+        except Exception as e:
+            results['rms_calc_err'] = str(e)
+
+    results['gemini_api_key_present'] = bool(os.environ.get("GEMINI_API_KEY"))
+    return jsonify(results)
 
 @socketio.on('gemini_button')
 def handle_gemini_button():
