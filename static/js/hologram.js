@@ -1867,29 +1867,30 @@ document.addEventListener('DOMContentLoaded', () => {
             isTouchActive = data.touch !== undefined ? data.touch : true;
             isGrabActive = data.grab !== undefined ? data.grab : false;
 
-            // Sync absolute cursor position if provided in hardware packet
             if (data.x !== undefined) handX = 1.0 - data.x;
             if (data.y !== undefined) handY = data.y;
 
-            // Set flag to true temporarily so automatic spin doesn't conflict
             isGestureDragging = isTouchActive;
 
-            // Clear dragging flag after a short timeout of inactive packets
             if (window.hwRotateTimeout) clearTimeout(window.hwRotateTimeout);
             window.hwRotateTimeout = setTimeout(() => {
                 isGestureDragging = false;
                 isTouchActive = false;
                 isGrabActive = false;
-            }, 180); // slightly longer buffer for wireless latency
+                rotVelY *= 0.5;
+                rotVelX *= 0.5;
+            }, 200);
 
             const sensitivity = dragSensitivity;
-            hologramCube.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), dx * sensitivity);
-            hologramCube.rotateOnWorldAxis(new THREE.Vector3(1, 0, 0), dy * sensitivity);
+            // Smooth target velocity LERP for 60 FPS fluid rotation
+            const targetY = Math.max(-0.22, Math.min(0.22, dx * sensitivity * 0.35));
+            const targetX = Math.max(-0.22, Math.min(0.22, dy * sensitivity * 0.35));
+            
+            rotVelY += (targetY - rotVelY) * 0.40;
+            rotVelX += (targetX - rotVelX) * 0.40;
 
-            const maxInertia = 0.20;
-            rotVelY = Math.max(-maxInertia, Math.min(maxInertia, dx * sensitivity * 0.50));
-            rotVelX = Math.max(-maxInertia, Math.min(maxInertia, dy * sensitivity * 0.50));
-            rotVelZ = Math.max(-maxInertia * 0.3, Math.min(maxInertia * 0.3, (dx + dy) * sensitivity * 0.10));
+            hologramCube.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), rotVelY);
+            hologramCube.rotateOnWorldAxis(new THREE.Vector3(1, 0, 0), rotVelX);
 
             lastInteractionTime = Date.now();
             if (isGrabActive) {
@@ -1914,7 +1915,17 @@ document.addEventListener('DOMContentLoaded', () => {
             gestureStatus.textContent = 'HW 제스처: 재생/일시정지 토글';
         } else if (actionType === 'seek') {
             if (audio.duration) {
-                audio.currentTime = velocity * audio.duration;
+                const targetTime = velocity * audio.duration;
+                // Defer audio.currentTime assignment to prevent audio buffer stuttering during continuous pinch drag
+                if (Math.abs(audio.currentTime - targetTime) > 2.0 || !window.seekAudioDebounce) {
+                    audio.currentTime = targetTime;
+                }
+                if (window.seekAudioDebounce) clearTimeout(window.seekAudioDebounce);
+                window.seekAudioDebounce = setTimeout(() => {
+                    audio.currentTime = targetTime;
+                    window.seekAudioDebounce = null;
+                }, 180);
+
                 gestureStatus.textContent = `HW 제스처: 곡 재생구간 이동 (${Math.round(velocity * 100)}%)`;
                 syncPlayerState();
             }
