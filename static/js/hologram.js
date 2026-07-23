@@ -182,6 +182,7 @@ document.addEventListener('DOMContentLoaded', () => {
         exitStateAction(mode, state) {
             this.clearListeningTimeout();
             if (mode === 'GEMINI') {
+                if (audio) audio.volume = 1.0; // Restore music volume
                 if (state === 'LISTENING') {
                     if (geminiRecognition) {
                         try { geminiRecognition.abort(); } catch (e) { }
@@ -2213,7 +2214,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Reset to Default Parameters
         if (btnResetCubePanel) {
             btnResetCubePanel.addEventListener('click', () => {
-                if (inputCubeScale) { inputCubeScale.value = 1.0; inputCubeScale.dispatchEvent(new Event('input')); }
+                if (inputCubeScale) { inputCubeScale.value = 0.8; inputCubeScale.dispatchEvent(new Event('input')); }
                 if (inputCubeThickness) { inputCubeThickness.value = 1.0; inputCubeThickness.dispatchEvent(new Event('input')); }
                 if (inputCubeSpinSpeed) { inputCubeSpinSpeed.value = 0.005; inputCubeSpinSpeed.dispatchEvent(new Event('input')); }
                 if (inputCubeFriction) { inputCubeFriction.value = 0.98; inputCubeFriction.dispatchEvent(new Event('input')); }
@@ -2221,4 +2222,70 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
     }
+
+    // --- Continuous "Hey Gemini" Background Voice Trigger Engine ---
+    let voiceRecognizer = null;
+    function initHeyGeminiVoiceTrigger() {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            console.warn("[Voice Trigger] Web Speech API not supported on this browser.");
+            return;
+        }
+
+        try {
+            voiceRecognizer = new SpeechRecognition();
+            voiceRecognizer.continuous = true;
+            voiceRecognizer.interimResults = true;
+            voiceRecognizer.lang = 'en-US';
+
+            voiceRecognizer.onresult = (event) => {
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    const text = event.results[i][0].transcript.toLowerCase().trim();
+
+                    if (text.includes('hey gemini') || text.includes('gemini') || text.includes('헤이 제미나이') || text.includes('제미나이')) {
+                        console.log("🔥 [Voice Trigger Activated!] 'Hey Gemini' detected!");
+                        
+                        // Prevent multi-triggering if already in GEMINI mode
+                        if (HologramStateManager.currentMode === 'GEMINI') return;
+
+                        // 1. Duck Music Volume to 15% so user's voice isn't drowned out
+                        if (audio) audio.volume = 0.15;
+
+                        // 2. Transition 3D Viewport to Gemini Mode
+                        HologramStateManager.transitionTo('GEMINI', 'LISTENING');
+                        gestureStatus.textContent = '🎙️ "Hey Gemini" 호출 감지! 말씀하세요...';
+
+                        // 3. Trigger Gemini Audio Recording Session
+                        if (btnGeminiMic) {
+                            btnGeminiMic.click();
+                        }
+                        break;
+                    }
+                }
+            };
+
+            voiceRecognizer.onerror = (e) => {
+                if (e.error !== 'no-speech' && e.error !== 'aborted') {
+                    console.warn("[Voice Trigger Listener Notice]", e.error);
+                }
+            };
+
+            voiceRecognizer.onend = () => {
+                // Keep listening continuously in background when not in active Gemini conversation
+                if (HologramStateManager.currentMode !== 'GEMINI') {
+                    setTimeout(() => {
+                        try { voiceRecognizer.start(); } catch (err) {}
+                    }, 800);
+                }
+            };
+
+            voiceRecognizer.start();
+            console.log("[Voice Trigger Engine] 'Hey Gemini' background voice listener active!");
+        } catch (e) {
+            console.error("[Voice Trigger Init Exception]", e);
+        }
+    }
+
+    // Initialize "Hey Gemini" Voice Trigger
+    initHeyGeminiVoiceTrigger();
 });
