@@ -1994,6 +1994,31 @@ document.addEventListener('DOMContentLoaded', () => {
             guideToggle.checked = data.showGuides;
             toggleGuideLines();
         }
+        if (data.key === 'cube_settings') {
+            if (data.scale !== undefined) {
+                targetCubeScale = parseFloat(data.scale);
+                const thickVal = (data.thickness !== undefined) ? parseFloat(data.thickness) : 1.0;
+                if (hologramCube) hologramCube.scale.set(targetCubeScale, targetCubeScale, targetCubeScale * thickVal);
+            }
+            if (data.thickness !== undefined && data.scale === undefined) {
+                const scaleVal = targetCubeScale || 1.0;
+                if (hologramCube) hologramCube.scale.set(scaleVal, scaleVal, scaleVal * parseFloat(data.thickness));
+            }
+            if (data.spinSpeed !== undefined) {
+                targetRotVelY = parseFloat(data.spinSpeed);
+                rotVelY = targetRotVelY;
+            }
+            if (data.friction !== undefined) {
+                friction = parseFloat(data.friction);
+            }
+            if (data.opacity !== undefined) {
+                targetCubeOpacity = parseFloat(data.opacity);
+                if (hologramCube && hologramCube.material) {
+                    const mats = Array.isArray(hologramCube.material) ? hologramCube.material : [hologramCube.material];
+                    mats.forEach(m => { if (m) m.opacity = targetCubeOpacity; });
+                }
+            }
+        }
         if (data.webcamEnabled !== undefined) {
             webcamToggle.checked = data.webcamEnabled;
             if (data.webcamEnabled) {
@@ -2065,4 +2090,104 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => {
         onWindowResize();
     }, 150);
+
+    // --- 3D Cube Realtime Adjustment Control Panel Engine ---
+    const btnToggleCubePanel = document.getElementById('btn-toggle-cube-panel');
+    const cubeControlPanel = document.getElementById('cube-control-panel');
+    const btnCloseCubePanel = document.getElementById('btn-close-cube-panel');
+    const btnResetCubePanel = document.getElementById('btn-reset-cube-panel');
+
+    const inputCubeScale = document.getElementById('cube-scale');
+    const inputCubeThickness = document.getElementById('cube-thickness');
+    const inputCubeSpinSpeed = document.getElementById('cube-spin-speed');
+    const inputCubeFriction = document.getElementById('cube-friction');
+    const inputCubeOpacity = document.getElementById('cube-opacity');
+
+    const valCubeScale = document.getElementById('val-cube-scale');
+    const valCubeThickness = document.getElementById('val-cube-thickness');
+    const valCubeSpinSpeed = document.getElementById('val-cube-spin-speed');
+    const valCubeFriction = document.getElementById('val-cube-friction');
+    const valCubeOpacity = document.getElementById('val-cube-opacity');
+
+    if (btnToggleCubePanel && cubeControlPanel) {
+        btnToggleCubePanel.addEventListener('click', (e) => {
+            e.stopPropagation();
+            cubeControlPanel.classList.toggle('hidden');
+        });
+
+        if (btnCloseCubePanel) {
+            btnCloseCubePanel.addEventListener('click', (e) => {
+                e.stopPropagation();
+                cubeControlPanel.classList.add('hidden');
+            });
+        }
+
+        // 1. Cube Overall Scale
+        if (inputCubeScale) {
+            inputCubeScale.addEventListener('input', (e) => {
+                const scaleVal = parseFloat(e.target.value);
+                valCubeScale.textContent = `${scaleVal.toFixed(1)}x`;
+                targetCubeScale = scaleVal;
+                if (hologramCube) {
+                    const thickVal = parseFloat(inputCubeThickness ? inputCubeThickness.value : 1.0);
+                    hologramCube.scale.set(scaleVal, scaleVal, scaleVal * thickVal);
+                }
+            });
+        }
+
+        // 2. Cube Z-Thickness Ratio
+        if (inputCubeThickness) {
+            inputCubeThickness.addEventListener('input', (e) => {
+                const thickVal = parseFloat(e.target.value);
+                valCubeThickness.textContent = `${thickVal.toFixed(2)}x`;
+                if (hologramCube) {
+                    const scaleVal = targetCubeScale || 1.0;
+                    hologramCube.scale.set(scaleVal, scaleVal, scaleVal * thickVal);
+                }
+            });
+        }
+
+        // 3. Rotation Speed
+        if (inputCubeSpinSpeed) {
+            inputCubeSpinSpeed.addEventListener('input', (e) => {
+                const spinVal = parseFloat(e.target.value);
+                valCubeSpinSpeed.textContent = spinVal.toFixed(3);
+                targetRotVelY = spinVal;
+                rotVelY = spinVal;
+            });
+        }
+
+        // 4. Inertia Friction
+        if (inputCubeFriction) {
+            inputCubeFriction.addEventListener('input', (e) => {
+                const fricVal = parseFloat(e.target.value);
+                valCubeFriction.textContent = fricVal.toFixed(3);
+                friction = fricVal;
+            });
+        }
+
+        // 5. Opacity
+        if (inputCubeOpacity) {
+            inputCubeOpacity.addEventListener('input', (e) => {
+                const opacVal = parseFloat(e.target.value);
+                valCubeOpacity.textContent = `${Math.round(opacVal * 100)}%`;
+                targetCubeOpacity = opacVal;
+                if (hologramCube && hologramCube.material) {
+                    const mats = Array.isArray(hologramCube.material) ? hologramCube.material : [hologramCube.material];
+                    mats.forEach(m => { if (m) m.opacity = opacVal; });
+                }
+            });
+        }
+
+        // Reset to Default Parameters
+        if (btnResetCubePanel) {
+            btnResetCubePanel.addEventListener('click', () => {
+                if (inputCubeScale) { inputCubeScale.value = 1.0; inputCubeScale.dispatchEvent(new Event('input')); }
+                if (inputCubeThickness) { inputCubeThickness.value = 1.0; inputCubeThickness.dispatchEvent(new Event('input')); }
+                if (inputCubeSpinSpeed) { inputCubeSpinSpeed.value = 0.005; inputCubeSpinSpeed.dispatchEvent(new Event('input')); }
+                if (inputCubeFriction) { inputCubeFriction.value = 0.98; inputCubeFriction.dispatchEvent(new Event('input')); }
+                if (inputCubeOpacity) { inputCubeOpacity.value = 1.0; inputCubeOpacity.dispatchEvent(new Event('input')); }
+            });
+        }
+    }
 });

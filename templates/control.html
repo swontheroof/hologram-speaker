@@ -374,6 +374,41 @@
             </div>
         </section>
 
+        <!-- 3D Cube Remote Adjustment Section -->
+        <section class="panel-section">
+            <h3 class="section-title">🧊 3D 큐브 실시간 조절</h3>
+
+            <div class="setting-row">
+                <label for="remote-cube-scale">큐브 크기 (<span id="lbl-cube-scale" style="color:var(--accent-blue); font-family:'JetBrains Mono'; font-weight:600;">1.0x</span>)</label>
+                <input type="range" id="remote-cube-scale" min="0.4" max="2.2" step="0.1" value="1.0">
+            </div>
+
+            <div class="setting-row">
+                <label for="remote-cube-thickness">큐브 두께 Z축 (<span id="lbl-cube-thickness" style="color:var(--accent-blue); font-family:'JetBrains Mono'; font-weight:600;">1.0x</span>)</label>
+                <input type="range" id="remote-cube-thickness" min="0.05" max="2.0" step="0.05" value="1.0">
+            </div>
+
+            <div class="setting-row">
+                <label for="remote-cube-spin-speed">회전 속도 (<span id="lbl-cube-spin-speed" style="color:var(--accent-blue); font-family:'JetBrains Mono'; font-weight:600;">0.005</span>)</label>
+                <input type="range" id="remote-cube-spin-speed" min="0.000" max="0.030" step="0.001" value="0.005">
+            </div>
+
+            <div class="setting-row">
+                <label for="remote-cube-friction">회전 관성 (<span id="lbl-cube-friction" style="color:var(--accent-blue); font-family:'JetBrains Mono'; font-weight:600;">0.98</span>)</label>
+                <input type="range" id="remote-cube-friction" min="0.90" max="0.99" step="0.005" value="0.98">
+            </div>
+
+            <div class="setting-row">
+                <label for="remote-cube-opacity">투명도 (<span id="lbl-cube-opacity" style="color:var(--accent-blue); font-family:'JetBrains Mono'; font-weight:600;">100%</span>)</label>
+                <input type="range" id="remote-cube-opacity" min="0.1" max="1.0" step="0.05" value="1.0">
+            </div>
+
+            <button type="button" id="btn-reset-remote-cube"
+                style="width: 100%; margin-top: 10px; padding: 10px; background: rgba(255,255,255,0.08); border: 1px solid var(--border-glass); border-radius: 10px; color: white; font-weight: 600; cursor: pointer; transition: background 0.2s;">
+                🔄 큐브 설정 초기화
+            </button>
+        </section>
+
         <!-- Settings Calibration Sliders -->
         <section class="panel-section">
             <h3 class="section-title">⚙️ 원격 센서 캘리브레이션</h3>
@@ -695,6 +730,61 @@
                 btnToggleCamStream.textContent = '미리보기 열기';
             }
         });
+
+        // 6. 3D Cube Remote Realtime Adjustment handlers
+        const remoteCubeScale = document.getElementById('remote-cube-scale');
+        const remoteCubeThickness = document.getElementById('remote-cube-thickness');
+        const remoteCubeSpinSpeed = document.getElementById('remote-cube-spin-speed');
+        const remoteCubeFriction = document.getElementById('remote-cube-friction');
+        const remoteCubeOpacity = document.getElementById('remote-cube-opacity');
+        const btnResetRemoteCube = document.getElementById('btn-reset-remote-cube');
+
+        const lblCubeScale = document.getElementById('lbl-cube-scale');
+        const lblCubeThickness = document.getElementById('lbl-cube-thickness');
+        const lblCubeSpinSpeed = document.getElementById('lbl-cube-spin-speed');
+        const lblCubeFriction = document.getElementById('lbl-cube-friction');
+        const lblCubeOpacity = document.getElementById('lbl-cube-opacity');
+
+        function emitCubeSettings() {
+            if (!remoteCubeScale) return;
+            const scale = parseFloat(remoteCubeScale.value);
+            const thickness = parseFloat(remoteCubeThickness.value);
+            const spinSpeed = parseFloat(remoteCubeSpinSpeed.value);
+            const friction = parseFloat(remoteCubeFriction.value);
+            const opacity = parseFloat(remoteCubeOpacity.value);
+
+            if (lblCubeScale) lblCubeScale.textContent = `${scale.toFixed(1)}x`;
+            if (lblCubeThickness) lblCubeThickness.textContent = `${thickness.toFixed(2)}x`;
+            if (lblCubeSpinSpeed) lblCubeSpinSpeed.textContent = spinSpeed.toFixed(3);
+            if (lblCubeFriction) lblCubeFriction.textContent = friction.toFixed(3);
+            if (lblCubeOpacity) lblCubeOpacity.textContent = `${Math.round(opacity * 100)}%`;
+
+            socket.emit('remote_setting_change', {
+                key: 'cube_settings',
+                scale: scale,
+                thickness: thickness,
+                spinSpeed: spinSpeed,
+                friction: friction,
+                opacity: opacity
+            });
+        }
+
+        [remoteCubeScale, remoteCubeThickness, remoteCubeSpinSpeed, remoteCubeFriction, remoteCubeOpacity].forEach(input => {
+            if (input) {
+                input.addEventListener('input', emitCubeSettings);
+            }
+        });
+
+        if (btnResetRemoteCube) {
+            btnResetRemoteCube.addEventListener('click', () => {
+                if (remoteCubeScale) remoteCubeScale.value = 1.0;
+                if (remoteCubeThickness) remoteCubeThickness.value = 1.0;
+                if (remoteCubeSpinSpeed) remoteCubeSpinSpeed.value = 0.005;
+                if (remoteCubeFriction) remoteCubeFriction.value = 0.98;
+                if (remoteCubeOpacity) remoteCubeOpacity.value = 1.0;
+                emitCubeSettings();
+            });
+        }
     </script>
 </body>
 

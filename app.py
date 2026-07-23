@@ -80,6 +80,10 @@ SONGS = [
 def index():
     return render_template('index.html')
 
+@app.route('/control')
+def control():
+    return render_template('control.html')
+
 @app.route('/api/songs', methods=['GET'])
 def get_songs():
     return jsonify(SONGS)
