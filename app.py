@@ -578,7 +578,10 @@ def find_usb_mic_device():
         print(f"[USB Mic Find Error] {e}", flush=True)
     return ["default", "plughw:2,0", "pulse", "hw:2,0"]
 
+is_gemini_cancelled = False
+
 def record_and_process_audio():
+    global is_gemini_cancelled
     import base64
     mic_dev_candidates = find_usb_mic_device()
     wav_path = "/tmp/gemini_input.wav"
@@ -598,6 +601,10 @@ def record_and_process_audio():
                 print(f"[Gemini Mic] Device '{mic_dev}' failed or empty. Stderr: {res.stderr.strip()}", flush=True)
         except Exception as e:
             print(f"[Gemini Mic] Error with device '{mic_dev}': {e}", flush=True)
+
+    if is_gemini_cancelled:
+        print("[Gemini Mic] Aborting mic processing due to cancellation flag.", flush=True)
+        return
 
     if not captured:
         print("[Gemini Mic Error] All recording devices failed!", flush=True)
@@ -665,6 +672,10 @@ def record_and_process_audio():
         if action_type:
             print(f"[Gemini Action] Detected action: {action_type}. Emitting socket event.", flush=True)
             socketio.emit('gesture_trigger', {'type': action_type})
+
+        if is_gemini_cancelled:
+            print("[Gemini Mic] Aborting Gemini response emit due to cancellation flag.", flush=True)
+            return
 
         print(f"[Gemini Mic Answer] {answer}", flush=True)
         socketio.emit('gemini_mic_response', {'response': answer})
@@ -757,10 +768,18 @@ def tts_proxy():
 
 @socketio.on('gemini_button')
 def handle_gemini_button():
+    global is_gemini_cancelled
     import threading
     print("[WebSocket] Received hardware gemini button event. Starting USB Mic capture...", flush=True)
+    is_gemini_cancelled = False
     emit('gemini_toggle', {}, broadcast=True)
     threading.Thread(target=record_and_process_audio, daemon=True).start()
+
+@socketio.on('gemini_cancel')
+def handle_gemini_cancel():
+    global is_gemini_cancelled
+    print("[WebSocket] Received gemini_cancel event. Aborting active Gemini session.", flush=True)
+    is_gemini_cancelled = True
 
 # Remote control sync events
 @socketio.on('remote_setting_change')

@@ -1843,6 +1843,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function toggleGeminiMode() {
         if (HologramStateManager.currentMode === 'GEMINI') {
+            console.log("[Gemini] Forcibly exiting Gemini mode...");
+            stopTTS(); // Immediately cut off any TTS audio playback!
+            if (socket && socket.connected) {
+                socket.emit('gemini_cancel');
+            }
             HologramStateManager.restorePreviousState();
         } else {
             wasPlayingBeforeGemini = isPlaying; // Backup playing state
@@ -2005,6 +2010,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Remote Gemini USB Mic Synchronization
     socket.on('gemini_mic_state', (data) => {
+        if (HologramStateManager.currentMode !== 'GEMINI') return; // Ignore if cancelled!
         if (data.state === 'THINKING') {
             gestureStatus.textContent = '제미나이: 생각 중... ☄️';
             HologramStateManager.transitionTo('GEMINI', 'THINKING');
@@ -2012,6 +2018,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     socket.on('gemini_mic_response', (data) => {
+        if (HologramStateManager.currentMode !== 'GEMINI') return; // Ignore if cancelled!
         const answer = data.response;
         console.log("[Gemini USB Mic Response]", answer);
         gestureStatus.textContent = `제미나이: "${answer}"`;
