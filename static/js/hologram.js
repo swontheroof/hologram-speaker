@@ -79,7 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let lastVy = 0;
     let trackingLossFrames = 0;         // Frame buffer for high-speed tracking loss grace period
     let poseLossFrames = 0;             // Frame buffer for temporary pose misclassification grace period
-    let dragSensitivity = 42.0;         // Interactive rotation sensitivity slider variable
+    let dragSensitivity = 205.0;        // Interactive rotation sensitivity slider variable (Default: 205)
     let lastInteractionTime = Date.now();
 
     // MediaPipe & Gesture Recognition State
@@ -115,7 +115,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Smooth transition target states
     let targetCubeOpacity = 1.0;
     let targetGeminiOpacity = 0.0;
-    let targetCubeScale = 1.0;
+    let targetCubeScale = 0.8;
     let targetGeminiScale = 0.0;
 
     let targetRotVelX = 0.001;

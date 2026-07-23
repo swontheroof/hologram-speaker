@@ -1,9 +1,37 @@
 import os
+import sys
+import shutil
+
+# Prevent macOS AVFoundation thread authorization block for OpenCV camera thread
+os.environ['OPENCV_AVFOUNDATION_SKIP_AUTH'] = '1'
 import json
 import subprocess
 import urllib.request
+import threading
+
+# Ensure active venv site-packages path is globally available for background threads
+for root_dir in [os.path.dirname(__file__), os.path.dirname(os.path.dirname(__file__))]:
+    for venv_name in ['venv', '.venv']:
+        sp = os.path.join(root_dir, venv_name, 'lib', f'python{sys.version_info.major}.{sys.version_info.minor}', 'site-packages')
+        if os.path.exists(sp) and sp not in sys.path:
+            sys.path.insert(0, sp)
+
+# Also check site-packages of currently running interpreter
+exec_dir = os.path.dirname(os.path.dirname(sys.executable))
+exec_sp = os.path.join(exec_dir, 'lib', f'python{sys.version_info.major}.{sys.version_info.minor}', 'site-packages')
+if os.path.exists(exec_sp) and exec_sp not in sys.path:
+    sys.path.insert(0, exec_sp)
+
+main_sys_path = list(sys.path)
 from flask import Flask, render_template, jsonify, request, Response
 from flask_socketio import SocketIO, emit
+
+try:
+    import cv2
+    import numpy as np
+except Exception as e:
+    cv2 = None
+    np = None
 
 # Manually load .env file if it exists to avoid python-dotenv dependency
 env_file_path = os.path.join(os.path.dirname(__file__), '.env')
@@ -349,67 +377,66 @@ def process_motion_gesture(frame):
     except Exception:
         pass
 
-def gen_camera_frames():
-    """MJPEG Live Camera Streamer with built-in Gesture Detection for Pi 5"""
-    import subprocess
-    import shutil
-    import cv2
-    import numpy as np
+# Global Camera Frame & Thread State for 24/7 background gesture tracking
+latest_camera_jpg = None
+camera_thread_started = False
+camera_lock = threading.Lock()
 
-    # 1. Try native Raspberry Pi 5 libcamera streamer (rpicam-vid / libcamera-vid)
-    cam_cmd = shutil.which("rpicam-vid") or shutil.which("libcamera-vid")
-    if cam_cmd:
-        proc = None
-        try:
-            # Kill any previous background camera process so device isn't busy
-            subprocess.run(["pkill", "-9", "-f", "rpicam-vid"], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
-            subprocess.run(["pkill", "-9", "-f", "libcamera-vid"], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
-            
-            print(f"[Camera Stream] Starting Pi 5 libcamera process: {cam_cmd}")
-            proc = subprocess.Popen(
-                [cam_cmd, "-t", "0", "--inline", "--width", "640", "--height", "480", "--codec", "mjpeg", "--framerate", "30", "-o", "-"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL
-            )
-            buffer = b""
-            frame_counter = 0
-            while True:
-                chunk = proc.stdout.read(4096)
-                if not chunk:
-                    break
-                buffer += chunk
-                a = buffer.find(b'\xff\xd8')
-                b = buffer.find(b'\xff\xd9')
-                if a != -1 and b != -1:
-                    jpg = buffer[a:b+2]
-                    buffer = buffer[b+2:]
-                    
-                    frame_counter += 1
-                    # Analyze MediaPipe AI motion gesture on alternating frames (15 FPS AI, 30 FPS video)
-                    if frame_counter % 2 == 0:
+def background_camera_loop():
+    """Independent Background Thread: Continuously captures camera frames & processes gestures 24/7"""
+    global latest_camera_jpg
+    import time
+    if cv2 is None:
+        print("[Background Camera Thread] Warning: OpenCV (cv2) not available.", flush=True)
+        return
+
+    try:
+        print("[Background Camera Thread] Starting continuous 24/7 gesture tracking thread...", flush=True)
+
+        # 1. Raspberry Pi 5 Native libcamera (rpicam-vid / libcamera-vid) Support
+        cam_cmd = shutil.which("rpicam-vid") or shutil.which("libcamera-vid")
+        if cam_cmd:
+            proc = None
+            try:
+                subprocess.run(["pkill", "-9", "-f", "rpicam-vid"], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+                subprocess.run(["pkill", "-9", "-f", "libcamera-vid"], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+                
+                print(f"[Background Camera Thread] Starting Pi 5 native camera: {cam_cmd}", flush=True)
+                proc = subprocess.Popen(
+                    [cam_cmd, "-t", "0", "--inline", "--width", "640", "--height", "480", "--codec", "mjpeg", "--framerate", "30", "-o", "-"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.DEVNULL
+                )
+                buffer = b""
+                while True:
+                    chunk = proc.stdout.read(4096)
+                    if not chunk:
+                        break
+                    buffer += chunk
+                    a = buffer.find(b'\xff\xd8')
+                    b = buffer.find(b'\xff\xd9')
+                    if a != -1 and b != -1:
+                        jpg = buffer[a:b+2]
+                        buffer = buffer[b+2:]
+                        
                         frame_decoded = cv2.imdecode(np.frombuffer(jpg, dtype=np.uint8), cv2.IMREAD_COLOR)
                         if frame_decoded is not None:
                             process_motion_gesture(frame_decoded)
 
-                    yield (b'--frame\r\n'
-                           b'Content-Type: image/jpeg\r\n\r\n' + jpg + b'\r\n')
-        except Exception as e:
-            print(f"[Camera Stream rpicam-vid Error] {e}")
-        finally:
-            if proc:
-                try:
-                    proc.kill()
-                    proc.wait(timeout=1)
-                except Exception:
-                    pass
-            return
+                        with camera_lock:
+                            latest_camera_jpg = jpg
+                return
+            except Exception as pi_e:
+                print(f"[Background Camera Thread Pi 5 Error] {pi_e}", flush=True)
+            finally:
+                if proc:
+                    try:
+                        proc.kill()
+                    except Exception:
+                        pass
 
-    # 2. Fallback to OpenCV V4L2 device probing
-    try:
-        import cv2
-        import sys
+        # 2. V4L2 / USB Webcam Fallback Probing
         cap = None
-        # On macOS (darwin), only probe index 0 to prevent hardware timeout blocking
         probe_indices = [0] if sys.platform == 'darwin' else [0, 1, 20, 19, 21]
         for idx in probe_indices:
             try:
@@ -418,35 +445,63 @@ def gen_camera_frames():
                     ret, test_frame = temp_cap.read()
                     if ret and test_frame is not None:
                         cap = temp_cap
-                        print(f"[Camera Stream] Successfully opened camera device index: {idx}", flush=True)
+                        print(f"[Background Camera Thread] Successfully opened camera device index: {idx}", flush=True)
                         break
                     temp_cap.release()
             except Exception:
                 pass
-        
+
         if not cap or not cap.isOpened():
-            print("[Camera Stream] Cannot open camera device. Displaying status banner.")
-            status_bytes = create_status_frame("Camera Hardware Not Found / Disconnected")
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + status_bytes + b'\r\n')
+            print("[Background Camera Thread] Warning: No camera device found. Displaying status banner.", flush=True)
+            latest_camera_jpg = create_status_frame("Camera Hardware Not Found / Disconnected")
             return
 
         while True:
-            success, frame = cap.read()
-            if not success or frame is None:
-                status_bytes = create_status_frame("Waiting for Camera Frame...")
-                yield (b'--frame\r\n'
-                       b'Content-Type: image/jpeg\r\n\r\n' + status_bytes + b'\r\n')
-                break
-            ret, buffer = cv2.imencode('.jpg', frame)
-            if not ret:
-                continue
-            frame_bytes = buffer.tobytes()
+            try:
+                success, frame = cap.read()
+                if not success or frame is None:
+                    time.sleep(0.05)
+                    continue
+
+                # Process gesture tracking on every frame 24/7
+                process_motion_gesture(frame)
+
+                # Encode latest frame to JPG for live preview stream
+                ret, buffer = cv2.imencode('.jpg', frame)
+                if ret:
+                    with camera_lock:
+                        latest_camera_jpg = buffer.tobytes()
+
+                time.sleep(0.03) # ~30 FPS loop rate
+            except Exception as e:
+                print(f"[Background Camera Thread Error] {e}", flush=True)
+                time.sleep(0.1)
+    except Exception as outer_e:
+        print(f"[Background Camera Thread Outer Error] {outer_e}", flush=True)
+
+def start_background_camera_thread():
+    global camera_thread_started
+    if not camera_thread_started:
+        camera_thread_started = True
+        t = threading.Thread(target=background_camera_loop, daemon=True)
+        t.start()
+
+def gen_camera_frames():
+    """MJPEG Live Camera Streamer serving latest background camera frame"""
+    start_background_camera_thread()
+    import time
+    while True:
+        with camera_lock:
+            jpg = latest_camera_jpg
+
+        if jpg:
             yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
-        cap.release()
-    except Exception as e:
-        print(f"[Camera Stream Error] {e}")
+                   b'Content-Type: image/jpeg\r\n\r\n' + jpg + b'\r\n')
+        else:
+            status_bytes = create_status_frame("Starting Camera Thread...")
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + status_bytes + b'\r\n')
+        time.sleep(0.04)
 
 @app.route('/video_feed')
 def video_feed():
@@ -808,5 +863,6 @@ def handle_remote_chat(data):
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5001))
-    print(f"Starting Hologram Speaker Server on http://0.0.0.0:{port} ...")
+    print(f"Starting Hologram Speaker Server on http://0.0.0.0:{port} ...", flush=True)
+    start_background_camera_thread()
     socketio.run(app, debug=False, host='0.0.0.0', port=port, allow_unsafe_werkzeug=True)

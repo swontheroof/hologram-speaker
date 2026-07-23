@@ -379,8 +379,8 @@
             <h3 class="section-title">🧊 3D 큐브 실시간 조절</h3>
 
             <div class="setting-row">
-                <label for="remote-cube-scale">큐브 크기 (<span id="lbl-cube-scale" style="color:var(--accent-blue); font-family:'JetBrains Mono'; font-weight:600;">1.0x</span>)</label>
-                <input type="range" id="remote-cube-scale" min="0.4" max="2.2" step="0.1" value="1.0">
+                <label for="remote-cube-scale">큐브 크기 (<span id="lbl-cube-scale" style="color:var(--accent-blue); font-family:'JetBrains Mono'; font-weight:600;">0.8x</span>)</label>
+                <input type="range" id="remote-cube-scale" min="0.4" max="2.2" step="0.1" value="0.8">
             </div>
 
             <div class="setting-row">
@@ -419,8 +419,8 @@
             </div>
 
             <div class="setting-row">
-                <label for="slider-sensitivity">회전 감도 (<span id="lbl-sensitivity" style="color:var(--accent-blue); font-family:'JetBrains Mono'; font-weight:600;">42</span>)</label>
-                <input type="range" id="slider-sensitivity" min="10" max="500" step="5" value="100">
+                <label for="slider-sensitivity">회전 감도 (<span id="lbl-sensitivity" style="color:var(--accent-blue); font-family:'JetBrains Mono'; font-weight:600;">205</span>)</label>
+                <input type="range" id="slider-sensitivity" min="10" max="500" step="5" value="205">
             </div>
 
             <div class="setting-row">
@@ -780,7 +780,7 @@
 
         if (btnResetRemoteCube) {
             btnResetRemoteCube.addEventListener('click', () => {
-                if (remoteCubeScale) remoteCubeScale.value = 1.0;
+                if (remoteCubeScale) remoteCubeScale.value = 0.8;
                 if (remoteCubeThickness) remoteCubeThickness.value = 1.0;
                 if (remoteCubeSpinSpeed) remoteCubeSpinSpeed.value = 0.005;
                 if (remoteCubeFriction) remoteCubeFriction.value = 0.98;
