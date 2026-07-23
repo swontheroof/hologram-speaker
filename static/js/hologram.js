@@ -52,7 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Interaction Parameters
     let friction = parseFloat(frictionSlider.value) || 0.98;
-    let showGuides = guideToggle.checked;
+    let showGuides = guideToggle ? guideToggle.checked : false;
 
     // Swipe & Rotation Physics State
     let isDragging = false;
