@@ -249,8 +249,8 @@ def process_motion_gesture(frame):
                                 mp_history = []
                                 return
 
-                    # --- 2. INDEX FINGER POINTING (Ultra-Fast 3D Cube Space Touch Rotation) ---
-                    if is_index_extended and pinch_ratio > 0.22:
+                    # --- 2. INDEX FINGER POINTING (Strict 3D Cube Space Touch Rotation) ---
+                    if is_index_only and not is_open_palm and pinch_ratio > 0.32:
                         mp_history = []
                         curr_px = 1.0 - index_tip.x # Mirrored X
                         curr_py = index_tip.y
