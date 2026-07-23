@@ -184,15 +184,22 @@ def process_motion_gesture(frame):
 
             if results and results.multi_hand_landmarks:
                 for hand_landmarks in results.multi_hand_landmarks:
-                    thumb_tip = hand_landmarks.landmark[4]
-                    index_tip = hand_landmarks.landmark[8]
-                    index_pip = hand_landmarks.landmark[6]
-                    middle_tip = hand_landmarks.landmark[12]
-                    middle_pip = hand_landmarks.landmark[10]
-                    middle_mcp = hand_landmarks.landmark[9]
-                    ring_tip = hand_landmarks.landmark[16]
-                    ring_pip = hand_landmarks.landmark[14]
                     wrist = hand_landmarks.landmark[0]
+                    thumb_mcp = hand_landmarks.landmark[2]
+                    thumb_tip = hand_landmarks.landmark[4]
+
+                    index_pip = hand_landmarks.landmark[6]
+                    index_tip = hand_landmarks.landmark[8]
+
+                    middle_mcp = hand_landmarks.landmark[9]
+                    middle_pip = hand_landmarks.landmark[10]
+                    middle_tip = hand_landmarks.landmark[12]
+
+                    ring_pip = hand_landmarks.landmark[14]
+                    ring_tip = hand_landmarks.landmark[16]
+
+                    pinky_pip = hand_landmarks.landmark[18]
+                    pinky_tip = hand_landmarks.landmark[20]
 
                     # 1. Calculate Hand Physical Size (Wrist to Middle MCP)
                     hand_size = np.hypot(wrist.x - middle_mcp.x, wrist.y - middle_mcp.y)
@@ -210,9 +217,6 @@ def process_motion_gesture(frame):
                     pinch_ratio = dist_pinch / max(0.01, hand_size)
 
                     # Multi-joint Finger Posture Analysis
-                    pinky_tip = hand_landmarks.landmark[20]
-                    pinky_pip = hand_landmarks.landmark[18]
-
                     is_index_extended = index_tip.y < index_pip.y
                     is_middle_extended = middle_tip.y < middle_pip.y
                     is_ring_extended = ring_tip.y < ring_pip.y
