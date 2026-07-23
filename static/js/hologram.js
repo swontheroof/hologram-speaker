@@ -1950,23 +1950,26 @@ document.addEventListener('DOMContentLoaded', () => {
             // Set flag to true temporarily so automatic spin doesn't conflict
             isGestureDragging = isTouchActive;
 
-            // Clear dragging flag after a short timeout of inactive packets
+            // Clear dragging flag quickly for instantaneous responsiveness
             if (window.hwRotateTimeout) clearTimeout(window.hwRotateTimeout);
             window.hwRotateTimeout = setTimeout(() => {
                 isGestureDragging = false;
                 isTouchActive = false;
                 isGrabActive = false;
-            }, 220); // Smooth buffer for wireless & frame gaps
+            }, 100); // 100ms snappy timeout for fast release
 
-            // Highly Responsive Powerful Gesture Rotation Physics
+            // Instant Lightning-Fast Responsive Physics (0ms Lag)
             const sensFactor = (dragSensitivity / 30.0);
-            const targetVx = dx * 1.6 * sensFactor;
-            const targetVy = dy * 1.6 * sensFactor;
+            const targetVx = dx * 2.2 * sensFactor;
+            const targetVy = dy * 2.2 * sensFactor;
 
-            // Direct momentum injection with smoothing
-            rotVelY += (targetVx - rotVelY) * 0.65;
-            rotVelX += (targetVy - rotVelX) * 0.65;
-            rotVelZ += ((targetVx + targetVy) * 0.3 - rotVelZ) * 0.40;
+            // Direct immediate rotation for 0ms response + velocity inertia
+            hologramCube.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), targetVx * 0.5);
+            hologramCube.rotateOnWorldAxis(new THREE.Vector3(1, 0, 0), targetVy * 0.5);
+
+            rotVelY = targetVx * 0.8;
+            rotVelX = targetVy * 0.8;
+            rotVelZ = (targetVx + targetVy) * 0.25;
 
             lastInteractionTime = Date.now();
             if (isGrabActive) {

@@ -472,7 +472,7 @@ def background_camera_loop():
                     with camera_lock:
                         latest_camera_jpg = buffer.tobytes()
 
-                time.sleep(0.03) # ~30 FPS loop rate
+                time.sleep(0.002) # Zero latency frame loop rate for instant gesture response
             except Exception as e:
                 print(f"[Background Camera Thread Error] {e}", flush=True)
                 time.sleep(0.1)
