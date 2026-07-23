@@ -139,11 +139,13 @@ try:
     import mediapipe as mp
     mp_hands_solution = mp.solutions.hands
     mp_drawing = mp.solutions.drawing_utils
+
     mp_hands_detector = mp_hands_solution.Hands(
         static_image_mode=False,
         max_num_hands=1,
-        min_detection_confidence=0.5,
-        min_tracking_confidence=0.5
+        model_complexity=0, # 0 for Ultra-Fast zero-latency CPU/Pi inference
+        min_detection_confidence=0.4,
+        min_tracking_confidence=0.4
     )
     print("[Camera Stream] MediaPipe AI 21-Keypoint Hand Engine loaded successfully into app.py!", flush=True)
 except Exception as e:
