@@ -161,6 +161,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         entryStateAction(mode, state) {
             if (mode === 'GEMINI') {
+                if (isPlaying) {
+                    pauseSong();
+                }
                 if (state === 'LISTENING') {
                     this.startListeningTimeout();
                     if (geminiRecognition) {
