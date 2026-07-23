@@ -1958,18 +1958,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 isGrabActive = false;
             }, 100); // 100ms snappy timeout for fast release
 
-            // Instant Lightning-Fast Responsive Physics (0ms Lag)
-            const sensFactor = (dragSensitivity / 30.0);
-            const targetVx = dx * 2.2 * sensFactor;
-            const targetVy = dy * 2.2 * sensFactor;
+            // Natural Direct 1:1 Responsive Physics (No artificial over-amplification)
+            const sensFactor = (dragSensitivity / 42.0);
+            const targetVx = dx * 1.0 * sensFactor;
+            const targetVy = dy * 1.0 * sensFactor;
 
-            // Direct immediate rotation for 0ms response + velocity inertia
-            hologramCube.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), targetVx * 0.5);
-            hologramCube.rotateOnWorldAxis(new THREE.Vector3(1, 0, 0), targetVy * 0.5);
+            // Direct immediate rotation for zero-latency + smooth velocity inertia
+            hologramCube.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), targetVx * 0.4);
+            hologramCube.rotateOnWorldAxis(new THREE.Vector3(1, 0, 0), targetVy * 0.4);
 
-            rotVelY = targetVx * 0.8;
-            rotVelX = targetVy * 0.8;
-            rotVelZ = (targetVx + targetVy) * 0.25;
+            rotVelY = targetVx * 0.6;
+            rotVelX = targetVy * 0.6;
+            rotVelZ = (targetVx + targetVy) * 0.2;
 
             lastInteractionTime = Date.now();
             if (isGrabActive) {

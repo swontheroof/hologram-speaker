@@ -247,19 +247,20 @@ def process_motion_gesture(frame):
                                 mp_history = []
                                 return
 
-                    # --- 2. INDEX FINGER POINTING (3D Cube Space Touch Rotation) ---
-                    if is_index_only and pinch_ratio > 0.35 and not is_near_edge:
+                    # --- 2. INDEX FINGER POINTING (Ultra-Fast 3D Cube Space Touch Rotation) ---
+                    if is_index_extended and pinch_ratio > 0.22:
                         mp_history = []
                         curr_px = 1.0 - index_tip.x # Mirrored X
                         curr_py = index_tip.y
                         if mp_prev_point_x is not None and mp_prev_point_y is not None:
                             raw_dx = curr_px - mp_prev_point_x
                             raw_dy = curr_py - mp_prev_point_y
-                            # Gentle, softened delta values with deadzone to eliminate hyper-sensitivity
-                            dx = max(-0.015, min(0.015, raw_dx)) * 0.40
-                            dy = max(-0.015, min(0.015, raw_dy)) * 0.40
-                            if abs(raw_dx) > 0.003 or abs(raw_dy) > 0.003:
-                                print(f"[Camera Gesture - MediaPipe AI] Gentle 3D Cube Rotation (dx: {dx:.3f}, dy: {dy:.3f})", flush=True)
+                            
+                            # Natural 1:1 direct finger tracking ratio without over-amplification
+                            dx = raw_dx
+                            dy = raw_dy
+                            
+                            if abs(raw_dx) > 0.0005 or abs(raw_dy) > 0.0005:
                                 socketio.emit('gesture_trigger', {
                                     'type': 'rotate',
                                     'dx': dx,
