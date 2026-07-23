@@ -994,13 +994,13 @@ document.addEventListener('DOMContentLoaded', () => {
             dragVelocityX = dx / dt;
             dragVelocityY = dy / dt;
 
-            // Sensitivity multiplier (Base: 42.0)
-            const sensFactor = (dragSensitivity / 42.0);
+            // Sensitivity multiplier
+            const sensFactor = (dragSensitivity / 30.0);
 
-            // Rotate cube instantly during drag on multiple axes
-            hologramCube.rotation.y += dx * 0.007 * sensFactor;
-            hologramCube.rotation.x += dy * 0.007 * sensFactor;
-            hologramCube.rotation.z += (dx + dy) * 0.003 * sensFactor;
+            // Rotate cube dynamically during drag with 5x higher responsiveness
+            hologramCube.rotation.y += dx * 0.035 * sensFactor;
+            hologramCube.rotation.x += dy * 0.035 * sensFactor;
+            hologramCube.rotation.z += (dx + dy) * 0.015 * sensFactor;
             lastInteractionTime = Date.now();
         }
 
@@ -1013,15 +1013,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!isDragging) return;
         isDragging = false;
 
-        const sensFactor = (dragSensitivity / 42.0);
+        const sensFactor = (dragSensitivity / 30.0);
 
-        // Map drag velocity to target rotation velocity with sensitivity scaling
-        rotVelY = dragVelocityX * 0.8 * sensFactor;
-        rotVelX = dragVelocityY * 0.8 * sensFactor;
-        rotVelZ = (dragVelocityX + dragVelocityY) * 0.3 * sensFactor;
+        // Map drag velocity to target rotation velocity with powerful spin impulse
+        rotVelY = dragVelocityX * 3.5 * sensFactor;
+        rotVelX = dragVelocityY * 3.5 * sensFactor;
+        rotVelZ = (dragVelocityX + dragVelocityY) * 1.2 * sensFactor;
 
-        // Expanded max velocity limit from 0.2 to 0.8 (4x max speed)
-        const maxVel = 0.8 * sensFactor;
+        // Expanded max velocity limit up to 3.5 for fast spinning
+        const maxVel = 3.5 * sensFactor;
         rotVelY = Math.max(-maxVel, Math.min(maxVel, rotVelY));
         rotVelX = Math.max(-maxVel, Math.min(maxVel, rotVelX));
         rotVelZ = Math.max(-maxVel, Math.min(maxVel, rotVelZ));
@@ -1943,15 +1943,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 isGrabActive = false;
             }, 220); // Smooth buffer for wireless & frame gaps
 
-            // Smooth Interpolated Rotation Physics (Removes discrete stuttering/jerking)
-            const sensFactor = (dragSensitivity / 42.0);
-            const targetVx = dx * 0.25 * sensFactor;
-            const targetVy = dy * 0.25 * sensFactor;
+            // Highly Responsive Powerful Gesture Rotation Physics
+            const sensFactor = (dragSensitivity / 30.0);
+            const targetVx = dx * 1.6 * sensFactor;
+            const targetVy = dy * 1.6 * sensFactor;
 
-            // Exponential velocity smoothing (Lerp) for silky 60fps movement
-            rotVelY += (targetVx - rotVelY) * 0.40;
-            rotVelX += (targetVy - rotVelX) * 0.40;
-            rotVelZ += ((targetVx + targetVy) * 0.15 - rotVelZ) * 0.25;
+            // Direct momentum injection with smoothing
+            rotVelY += (targetVx - rotVelY) * 0.65;
+            rotVelX += (targetVy - rotVelX) * 0.65;
+            rotVelZ += ((targetVx + targetVy) * 0.3 - rotVelZ) * 0.40;
 
             lastInteractionTime = Date.now();
             if (isGrabActive) {
