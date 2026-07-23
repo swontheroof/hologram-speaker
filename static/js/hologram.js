@@ -182,7 +182,6 @@ document.addEventListener('DOMContentLoaded', () => {
         exitStateAction(mode, state) {
             this.clearListeningTimeout();
             if (mode === 'GEMINI') {
-                if (audio) audio.volume = 1.0; // Restore music volume
                 if (state === 'LISTENING') {
                     if (geminiRecognition) {
                         try { geminiRecognition.abort(); } catch (e) { }
@@ -1999,6 +1998,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 gestureStatus.textContent = `HW 제스처: 곡 재생구간 이동 (${Math.round(velocity * 100)}%)`;
                 syncPlayerState();
             }
+        } else if (actionType === 'gemini_toggle') {
+            console.log("👍 [Thumbs-Up Gesture] Triggering Gemini AI Mode toggle...");
+            if (HologramStateManager.currentMode === 'GEMINI') {
+                HologramStateManager.transitionTo('MUSIC', 'IDLE');
+                gestureStatus.textContent = '👍 엄지 척! 홀로그램 스피커 모드로 복귀';
+            } else {
+                HologramStateManager.transitionTo('GEMINI', 'LISTENING');
+                gestureStatus.textContent = '👍 엄지 척! 제미나이 AI 모드 시작... 🤖';
+                if (btnGeminiMic) {
+                    btnGeminiMic.click();
+                }
+            }
         }
     });
 
@@ -2222,113 +2233,4 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
     }
-
-    // --- Continuous "Hey Gemini" Background Voice Trigger Engine ---
-    let voiceRecognizer = null;
-    let isVoiceTriggerListening = false;
-
-    function requestMicPermissionAndStartTrigger() {
-        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-            navigator.mediaDevices.getUserMedia({ audio: true }).then(() => {
-                console.log("🎙️ [Voice Trigger] Microphone permission granted!");
-                startVoiceTriggerListener();
-            }).catch(err => {
-                console.warn("🎙️ [Voice Trigger] Microphone permission denied or blocked:", err);
-                startVoiceTriggerListener();
-            });
-        } else {
-            startVoiceTriggerListener();
-        }
-    }
-
-    function startVoiceTriggerListener() {
-        if (isVoiceTriggerListening || HologramStateManager.currentMode === 'GEMINI') return;
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SpeechRecognition) {
-            console.warn("[Voice Trigger] Web Speech API not supported on this browser.");
-            return;
-        }
-
-        try {
-            if (!voiceRecognizer) {
-                voiceRecognizer = new SpeechRecognition();
-                voiceRecognizer.continuous = true;
-                voiceRecognizer.interimResults = true;
-                voiceRecognizer.lang = navigator.language || 'en-US';
-
-                voiceRecognizer.onstart = () => {
-                    isVoiceTriggerListening = true;
-                    console.log("🎙️ [Voice Trigger Engine] 'Hey Gemini' background listener is ON and active!");
-                };
-
-                voiceRecognizer.onresult = (event) => {
-                    for (let i = event.resultIndex; i < event.results.length; ++i) {
-                        const rawText = event.results[i][0].transcript.toLowerCase();
-                        const cleanText = rawText.replace(/\s+/g, '');
-                        console.log("🎙️ [Voice Listener Heard]:", rawText);
-
-                        if (HologramStateManager.currentMode !== 'GEMINI') {
-                            gestureStatus.textContent = `🎙️ 마이크 감지 중: "${rawText.slice(-20)}"`;
-                        }
-
-                        // Ultra-flexible wake word matching
-                        const isHit = cleanText.includes('gemini') || 
-                                      cleanText.includes('제미나이') || 
-                                      cleanText.includes('heygemini') || 
-                                      cleanText.includes('헤이제미나이') || 
-                                      cleanText.includes('해이제미나이') || 
-                                      cleanText.includes('higemini') || 
-                                      cleanText.includes('안녕제미나이');
-
-                        if (isHit) {
-                            console.log("🔥 [Voice Trigger Activated!] 'Hey Gemini' detected via:", rawText);
-                            
-                            // Prevent multi-triggering if already in GEMINI mode
-                            if (HologramStateManager.currentMode === 'GEMINI') return;
-
-                            // 1. Duck Music Volume to 15% so user's voice isn't drowned out
-                            if (audio) audio.volume = 0.15;
-
-                            // 2. Transition 3D Viewport to Gemini Mode
-                            HologramStateManager.transitionTo('GEMINI', 'LISTENING');
-                            gestureStatus.textContent = '🎙️ "Hey Gemini" 호출 감지! 말씀하세요...';
-
-                            // 3. Trigger Gemini Audio Recording Session
-                            if (btnGeminiMic) {
-                                btnGeminiMic.click();
-                            }
-                            break;
-                        }
-                    }
-                };
-
-                voiceRecognizer.onerror = (e) => {
-                    isVoiceTriggerListening = false;
-                    if (e.error !== 'no-speech' && e.error !== 'aborted') {
-                        console.warn("[Voice Trigger Listener Notice]", e.error);
-                    }
-                };
-
-                voiceRecognizer.onend = () => {
-                    isVoiceTriggerListening = false;
-                    // Keep listening continuously in background when not in active Gemini conversation
-                    if (HologramStateManager.currentMode !== 'GEMINI') {
-                        setTimeout(() => {
-                            try { voiceRecognizer.start(); } catch (err) {}
-                        }, 600);
-                    }
-                };
-            }
-
-            voiceRecognizer.start();
-        } catch (e) {
-            isVoiceTriggerListening = false;
-            console.error("[Voice Trigger Init Exception]", e);
-        }
-    }
-
-    // Request Mic Permission & Start Trigger on Load or First User Interaction
-    window.addEventListener('click', requestMicPermissionAndStartTrigger, { once: true });
-    window.addEventListener('touchstart', requestMicPermissionAndStartTrigger, { once: true });
-    requestMicPermissionAndStartTrigger();
 });

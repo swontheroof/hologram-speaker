@@ -210,14 +210,33 @@ def process_motion_gesture(frame):
                     pinch_ratio = dist_pinch / max(0.01, hand_size)
 
                     # Multi-joint Finger Posture Analysis
+                    pinky_tip = hand_landmarks.landmark[20]
+                    pinky_pip = hand_landmarks.landmark[18]
+
                     is_index_extended = index_tip.y < index_pip.y
                     is_middle_extended = middle_tip.y < middle_pip.y
                     is_ring_extended = ring_tip.y < ring_pip.y
+                    is_pinky_extended = pinky_tip.y < pinky_pip.y
                     is_open_palm = is_index_extended and is_middle_extended and is_ring_extended
                     is_index_only = is_index_extended and (not is_middle_extended) and (not is_ring_extended)
 
+                    # 👍 Thumbs-Up Condition: Thumb pointing UP, all other 4 fingers folded DOWN
+                    is_thumb_up = (thumb_tip.y < thumb_mcp.y) and (thumb_tip.y < index_pip.y)
+                    are_other_fingers_folded = (not is_index_extended) and (not is_middle_extended) and (not is_ring_extended) and (not is_pinky_extended)
+                    is_thumbs_up_gesture = is_thumb_up and are_other_fingers_folded
+
                     # --- BOUNDARY GUARD: Suppress swipe when hand is near frame edges ---
                     is_near_edge = (wrist.x < 0.12 or wrist.x > 0.88 or wrist.y < 0.10 or wrist.y > 0.90)
+
+                    # --- 0. 👍 THUMBS-UP GESTURE (Gemini AI Hologram Trigger) ---
+                    if is_thumbs_up_gesture and not is_near_edge:
+                        if current_time - mp_last_gesture_time >= 1.2:
+                            print("[Camera Gesture - MediaPipe AI] 👍 Thumbs-Up Gesture Detected! -> Gemini AI Mode Triggered!", flush=True)
+                            socketio.emit('gesture_trigger', {'type': 'gemini_toggle'})
+                            mp_last_gesture_time = current_time
+                            mp_history = []
+                            return
+                        return
 
                     # --- 1. PINCH & PINCH-DRAG SEEK (Scale-Invariant Hysteresis) ---
                     if (pinch_ratio < 0.28 or (is_pinching and pinch_ratio < 0.38)) and not is_open_palm and not is_near_edge:
