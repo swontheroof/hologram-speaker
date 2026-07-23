@@ -156,6 +156,7 @@ mp_history = []
 mp_last_gesture_time = 0
 is_pinching = False
 pinch_start_time = 0
+pinch_start_x = 0.5
 mp_last_seek_time = 0
 mp_prev_point_x = None
 mp_prev_point_y = None
@@ -166,7 +167,7 @@ last_motion_gesture_time = 0
 
 def process_motion_gesture(frame):
     global mp_hands_detector, mp_drawing, mp_hands_solution, mp_history, mp_last_gesture_time
-    global is_pinching, pinch_start_time, mp_last_seek_time
+    global is_pinching, pinch_start_time, pinch_start_x, mp_last_seek_time
     global mp_prev_point_x, mp_prev_point_y
     global prev_motion_gray, motion_history, last_motion_gesture_time
     try:
@@ -219,21 +220,22 @@ def process_motion_gesture(frame):
                     is_near_edge = (wrist.x < 0.12 or wrist.x > 0.88 or wrist.y < 0.10 or wrist.y > 0.90)
 
                     # --- 1. PINCH & PINCH-DRAG SEEK (Scale-Invariant Hysteresis) ---
-                    if (pinch_ratio < 0.28 or (is_pinching and pinch_ratio < 0.40)) and not is_open_palm and not is_near_edge:
+                    if (pinch_ratio < 0.28 or (is_pinching and pinch_ratio < 0.38)) and not is_open_palm and not is_near_edge:
                         mp_history = []
                         mp_prev_point_x = None
                         mp_prev_point_y = None
 
+                        curr_x = 1.0 - index_tip.x
                         if not is_pinching:
                             is_pinching = True
                             pinch_start_time = current_time
+                            pinch_start_x = curr_x
 
-                        # Pinch held > 0.20s -> Enter PINCH DRAG SEEK MODE!
-                        if current_time - pinch_start_time > 0.20:
-                            if current_time - mp_last_seek_time > 0.08:
-                                progress_ratio = 1.0 - index_tip.x
-                                progress_ratio = max(0.0, min(1.0, progress_ratio))
-                                print(f"[Camera Gesture - MediaPipe AI] Scale-Invariant Pinch Drag Seeking to {int(progress_ratio*100)}%", flush=True)
+                        # Pinch held > 0.25s AND user intentionally moved finger horizontally (> 0.06) -> Enter PINCH DRAG SEEK MODE!
+                        if current_time - pinch_start_time > 0.25 and abs(curr_x - pinch_start_x) > 0.06:
+                            if current_time - mp_last_seek_time > 0.10:
+                                progress_ratio = max(0.0, min(1.0, curr_x))
+                                print(f"[Camera Gesture - MediaPipe AI] Pinch Drag Seeking to {int(progress_ratio*100)}%", flush=True)
                                 socketio.emit('gesture_trigger', {'type': 'seek', 'value': progress_ratio})
                                 mp_last_seek_time = current_time
                         return
@@ -242,10 +244,11 @@ def process_motion_gesture(frame):
                         if is_pinching:
                             pinch_duration = current_time - pinch_start_time
                             is_pinching = False
-                            if pinch_duration < 0.35: # Quick pinch tap -> Play/Pause
-                                print("[Camera Gesture - MediaPipe AI] Quick Pinch Tap! -> Play/Pause Toggle", flush=True)
-                                socketio.emit('gesture_trigger', {'type': 'play_pause'})
+                            # Quick pinch tap (< 0.35s) WITH 0.7s cooldown guard -> Single Clean Play/Pause Toggle
+                            if pinch_duration < 0.35 and (current_time - mp_last_gesture_time >= 0.7):
+                                print("[Camera Gesture - MediaPipe AI] Single Clean Pinch Tap -> Play/Pause Toggle", flush=True)
                                 mp_last_gesture_time = current_time
+                                socketio.emit('gesture_trigger', {'type': 'play_pause'})
                                 mp_history = []
                                 return
 
