@@ -154,6 +154,7 @@ except Exception as e:
 
 mp_history = []
 mp_last_gesture_time = 0
+mp_last_thumbsup_time = 0
 is_pinching = False
 pinch_start_time = 0
 pinch_start_x = 0.5
@@ -166,7 +167,7 @@ motion_history = []
 last_motion_gesture_time = 0
 
 def process_motion_gesture(frame):
-    global mp_hands_detector, mp_drawing, mp_hands_solution, mp_history, mp_last_gesture_time
+    global mp_hands_detector, mp_drawing, mp_hands_solution, mp_history, mp_last_gesture_time, mp_last_thumbsup_time
     global is_pinching, pinch_start_time, pinch_start_x, mp_last_seek_time
     global mp_prev_point_x, mp_prev_point_y
     global prev_motion_gray, motion_history, last_motion_gesture_time
@@ -224,20 +225,27 @@ def process_motion_gesture(frame):
                     is_open_palm = is_index_extended and is_middle_extended and is_ring_extended
                     is_index_only = is_index_extended and (not is_middle_extended) and (not is_ring_extended)
 
-                    # 👍 Thumbs-Up Condition: Thumb pointing UP, all other 4 fingers folded DOWN
-                    is_thumb_up = (thumb_tip.y < thumb_mcp.y) and (thumb_tip.y < index_pip.y)
-                    are_other_fingers_folded = (not is_index_extended) and (not is_middle_extended) and (not is_ring_extended) and (not is_pinky_extended)
-                    is_thumbs_up_gesture = is_thumb_up and are_other_fingers_folded
+                    # 👍 Thumbs-Up Condition (High-Sensitivity & Zero Latency)
+                    # 1. Thumb tip is clearly pointing upwards above its MCP joint
+                    is_thumb_up = (thumb_tip.y < thumb_mcp.y - 0.02)
+                    
+                    # 2. Check if remaining 4 fingers are naturally folded (allowing comfortable real-life thumb-up stance)
+                    index_folded = index_tip.y > (index_pip.y - 0.03)
+                    middle_folded = middle_tip.y > (middle_pip.y - 0.03)
+                    ring_folded = ring_tip.y > (ring_pip.y - 0.03)
+                    pinky_folded = pinky_tip.y > (pinky_pip.y - 0.03)
+
+                    is_thumbs_up_gesture = is_thumb_up and index_folded and middle_folded and ring_folded and pinky_folded
 
                     # --- BOUNDARY GUARD: Suppress swipe when hand is near frame edges ---
-                    is_near_edge = (wrist.x < 0.12 or wrist.x > 0.88 or wrist.y < 0.10 or wrist.y > 0.90)
+                    is_near_edge = (wrist.x < 0.10 or wrist.x > 0.90 or wrist.y < 0.08 or wrist.y > 0.92)
 
-                    # --- 0. 👍 THUMBS-UP GESTURE (Gemini AI Hologram Trigger) ---
+                    # --- 0. 👍 THUMBS-UP GESTURE (Ultra-Responsive Gemini AI Trigger) ---
                     if is_thumbs_up_gesture and not is_near_edge:
-                        if current_time - mp_last_gesture_time >= 1.2:
-                            print("[Camera Gesture - MediaPipe AI] 👍 Thumbs-Up Gesture Detected! -> Gemini AI Mode Triggered!", flush=True)
+                        if current_time - mp_last_thumbsup_time >= 0.6:
+                            print("[Camera Gesture - MediaPipe AI] 👍 Thumbs-Up Gesture Triggered Immediately!", flush=True)
                             socketio.emit('gesture_trigger', {'type': 'gemini_toggle'})
-                            mp_last_gesture_time = current_time
+                            mp_last_thumbsup_time = current_time
                             mp_history = []
                             return
                         return
