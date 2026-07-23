@@ -1685,54 +1685,69 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- Gemini Voice Assistant Logic & Speech APIs ---
+    // --- Always-On Robust Gemini Voice Assistant Engine ---
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRecognition) {
-        geminiRecognition = new SpeechRecognition();
-        geminiRecognition.lang = 'ko-KR';
-        geminiRecognition.continuous = false;
-        geminiRecognition.interimResults = false;
+    let isSpeechActive = false;
 
-        geminiRecognition.onstart = () => {
-            console.log("[Gemini Speech] Listening started");
-            gestureStatus.textContent = '제미나이: 듣고 있습니다... 🎙️';
-        };
+    function startAlwaysOnSpeechRecognition() {
+        if (!SpeechRecognition || isSpeechActive) return;
+        try {
+            if (!geminiRecognition) {
+                geminiRecognition = new SpeechRecognition();
+                geminiRecognition.lang = 'ko-KR';
+                geminiRecognition.continuous = true;
+                geminiRecognition.interimResults = true;
 
-        geminiRecognition.onresult = (event) => {
-            const transcript = event.results[0][0].transcript;
-            console.log("[Gemini Speech] Recognized text:", transcript);
-            gestureStatus.textContent = `제미나이 인식: "${transcript}"`;
+                geminiRecognition.onstart = () => {
+                    isSpeechActive = true;
+                    console.log("[Gemini Speech] Always-On Mic Engine Active!");
+                };
 
-            // Trigger thinking state and API call
-            HologramStateManager.transitionTo('GEMINI', 'THINKING');
-            sendToGemini(transcript);
-        };
+                geminiRecognition.onresult = (event) => {
+                    for (let i = event.resultIndex; i < event.results.length; ++i) {
+                        if (event.results[i].isFinal) {
+                            const transcript = event.results[i][0].transcript.trim();
+                            console.log("[Gemini Speech Final Heard]:", transcript);
 
-        geminiRecognition.onerror = (event) => {
-            console.error("[Gemini Speech] Recognition error:", event.error);
-            if (HologramStateManager.currentMode === 'GEMINI') {
-                gestureStatus.textContent = '제미나이: 다시 말씀해 주세요... 🎙️';
-                // Automatically restart listening after brief delay if still in gemini mode
-                setTimeout(() => {
-                    if (HologramStateManager.currentMode === 'GEMINI' && HologramStateManager.subState === 'LISTENING') {
-                        try { geminiRecognition.start(); } catch (e) { }
+                            // Only process voice input when in active GEMINI LISTENING state!
+                            if (HologramStateManager.currentMode === 'GEMINI' && HologramStateManager.subState === 'LISTENING') {
+                                if (transcript.length > 1) {
+                                    gestureStatus.textContent = `제미나이 인식: "${transcript}"`;
+                                    HologramStateManager.transitionTo('GEMINI', 'THINKING');
+                                    sendToGemini(transcript);
+                                }
+                            }
+                        }
                     }
-                }, 1000);
-            }
-        };
+                };
 
-        geminiRecognition.onend = () => {
-            console.log("[Gemini Speech] Listening ended");
-            // If still in gemini mode and listening, restart listening
-            setTimeout(() => {
-                if (HologramStateManager.currentMode === 'GEMINI' && HologramStateManager.subState === 'LISTENING') {
-                    try { geminiRecognition.start(); } catch (e) { }
-                }
-            }, 800);
-        };
-    } else {
-        console.warn("SpeechRecognition API not supported in this browser.");
+                geminiRecognition.onerror = (event) => {
+                    isSpeechActive = false;
+                    if (event.error !== 'no-speech' && event.error !== 'aborted') {
+                        console.warn("[Gemini Speech] Recognition notice:", event.error);
+                    }
+                };
+
+                geminiRecognition.onend = () => {
+                    isSpeechActive = false;
+                    // Auto restart continuously in background
+                    setTimeout(() => {
+                        try { geminiRecognition.start(); } catch (e) { }
+                    }, 500);
+                };
+            }
+
+            geminiRecognition.start();
+        } catch (e) {
+            isSpeechActive = false;
+            console.error("[Gemini Speech Init Exception]", e);
+        }
     }
+
+    // Warmup Always-On Mic on Page Load or First User Interaction
+    window.addEventListener('click', startAlwaysOnSpeechRecognition, { once: true });
+    window.addEventListener('touchstart', startAlwaysOnSpeechRecognition, { once: true });
+    startAlwaysOnSpeechRecognition();
 
     function sendToGemini(text) {
         gestureStatus.textContent = '제미나이: 생각 중... ☄️';
