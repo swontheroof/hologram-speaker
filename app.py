@@ -571,20 +571,27 @@ def find_usb_mic_device():
         for line in out.splitlines():
             if "card" in line and ("USB" in line or "Codec" in line or "PnP" in line):
                 card_num = line.split("card")[1].split(":")[0].strip()
-                print(f"[USB Mic Auto-Detect] Found USB Audio Card {card_num}", flush=True)
-                return f"hw:{card_num},0"
+                print(f"[USB Mic Auto-Detect] Found USB Audio Card {card_num} -> Using plughw:{card_num},0", flush=True)
+                return f"plughw:{card_num},0"
     except Exception as e:
         print(f"[USB Mic Find Error] {e}", flush=True)
-    return "hw:2,0"
+    return "plughw:2,0"
 
 def record_and_process_audio():
     import base64
     mic_dev = find_usb_mic_device()
-    print(f"[Gemini Mic] Recording 3.5s audio from USB Mic ({mic_dev})...", flush=True)
+    print(f"[Gemini Mic] Recording 4.0s audio from USB Mic ({mic_dev})...", flush=True)
     wav_path = "/tmp/gemini_input.wav"
     try:
-        subprocess.run(["arecord", "-D", mic_dev, "-f", "S16_LE", "-r", "16000", "-c", "1", "-d", "3", wav_path], check=True, stderr=subprocess.DEVNULL)
-        print(f"[Gemini Mic] Audio recording finished! Processing with Gemini...", flush=True)
+        # Use plughw device with 44100Hz mono for 100% ALSA hardware compatibility
+        res = subprocess.run(["arecord", "-D", mic_dev, "-f", "S16_LE", "-r", "44100", "-c", "1", "-d", "4", wav_path], capture_output=True, text=True)
+        print(f"[Gemini Mic] arecord result: {res.returncode}, stderr: {res.stderr}", flush=True)
+
+        if not os.path.exists(wav_path) or os.path.getsize(wav_path) < 1000:
+            raise Exception("arecord failed to capture valid audio file")
+
+        file_size = os.path.getsize(wav_path)
+        print(f"[Gemini Mic] Audio recording finished! File size: {file_size} bytes. Processing with Gemini...", flush=True)
         socketio.emit('gemini_mic_state', {'state': 'THINKING'})
         
         with open(wav_path, "rb") as f:
@@ -622,7 +629,7 @@ def record_and_process_audio():
                 }
             }
             req = urllib.request.Request(url, data=json.dumps(body).encode('utf-8'), headers=headers, method='POST')
-            with urllib.request.urlopen(req, timeout=12) as response:
+            with urllib.request.urlopen(req, timeout=15) as response:
                 res_data = json.loads(response.read().decode('utf-8'))
                 answer = res_data['candidates'][0]['content']['parts'][0]['text']
 
