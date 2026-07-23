@@ -241,7 +241,7 @@ def process_motion_gesture(frame):
                     # --- BOUNDARY GUARD: Suppress swipe when hand is near frame edges ---
                     is_near_edge = (wrist.x < 0.10 or wrist.x > 0.90 or wrist.y < 0.08 or wrist.y > 0.92)
 
-                    # --- 0. 👍 THUMBS-UP GESTURE (Requires 0.45s Sustained Hold to Trigger Gemini AI) ---
+                    # --- 0. 👍 THUMBS-UP GESTURE (Triggers Full Gemini AI Button Event & USB Mic Capture) ---
                     if is_thumbs_up_gesture and not is_near_edge:
                         if thumbsup_start_time == 0:
                             thumbsup_start_time = current_time
@@ -252,10 +252,10 @@ def process_motion_gesture(frame):
                         if thumbsup_duration >= 0.45:
                             if current_time - mp_last_thumbsup_time >= 1.0:
                                 print(f"[Camera Gesture - MediaPipe AI] 👍 Thumbs-Up Held for {thumbsup_duration:.2f}s -> Gemini AI Mode Triggered!", flush=True)
-                                socketio.emit('gesture_trigger', {'type': 'gemini_toggle'})
                                 mp_last_thumbsup_time = current_time
                                 thumbsup_start_time = 0
                                 mp_history = []
+                                handle_gemini_button() # Triggers exact same USB Mic audio recording & Gemini API thread!
                                 return
                             return
                         return
