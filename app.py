@@ -208,10 +208,11 @@ def process_motion_gesture(frame):
                         if mp_prev_point_x is not None and mp_prev_point_y is not None:
                             raw_dx = curr_px - mp_prev_point_x
                             raw_dy = curr_py - mp_prev_point_y
-                            dx = max(-0.03, min(0.03, raw_dx)) * 1.5
-                            dy = max(-0.03, min(0.03, raw_dy)) * 1.5
-                            if abs(raw_dx) > 0.002 or abs(raw_dy) > 0.002:
-                                print(f"[Camera Gesture - MediaPipe AI] Index Pointing 3D Rotation (dx: {dx:.3f}, dy: {dy:.3f})", flush=True)
+                            # Gentle, softened delta values with deadzone to eliminate hyper-sensitivity
+                            dx = max(-0.015, min(0.015, raw_dx)) * 0.40
+                            dy = max(-0.015, min(0.015, raw_dy)) * 0.40
+                            if abs(raw_dx) > 0.003 or abs(raw_dy) > 0.003:
+                                print(f"[Camera Gesture - MediaPipe AI] Gentle 3D Cube Rotation (dx: {dx:.3f}, dy: {dy:.3f})", flush=True)
                                 socketio.emit('gesture_trigger', {
                                     'type': 'rotate',
                                     'dx': dx,

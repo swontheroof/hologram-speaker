@@ -1873,13 +1873,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 isGrabActive = false;
             }, 180); // slightly longer buffer for wireless latency
 
-            const sensitivity = dragSensitivity;
+            const sensitivity = dragSensitivity * 0.12;
             hologramCube.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), dx * sensitivity);
             hologramCube.rotateOnWorldAxis(new THREE.Vector3(1, 0, 0), dy * sensitivity);
 
-            const maxInertia = 0.20;
-            rotVelY = Math.max(-maxInertia, Math.min(maxInertia, dx * sensitivity * 0.50));
-            rotVelX = Math.max(-maxInertia, Math.min(maxInertia, dy * sensitivity * 0.50));
+            const maxInertia = 0.05;
+            rotVelY = Math.max(-maxInertia, Math.min(maxInertia, dx * sensitivity * 0.30));
+            rotVelX = Math.max(-maxInertia, Math.min(maxInertia, dy * sensitivity * 0.30));
             rotVelZ = Math.max(-maxInertia * 0.3, Math.min(maxInertia * 0.3, (dx + dy) * sensitivity * 0.10));
 
             lastInteractionTime = Date.now();
